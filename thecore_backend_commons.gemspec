@@ -26,7 +26,8 @@ Gem::Specification.new do |spec|
   spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
 
   spec.add_dependency 'thecore_auth_commons', '~> 2.1'
-
+  # Rails
+  spec.add_dependency 'rails-i18n', "~> 6.0"
   spec.add_dependency 'devise-i18n', "~> 1.5"
   # Auto Locale
   # A gem which helps you detect the users preferred language, as sent by the "Accept-Language" HTTP header.
