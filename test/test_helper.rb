@@ -8,8 +8,6 @@ require "rails/test_help"
 # Filter out the backtrace from minitest while preserving the one from other libraries.
 Minitest.backtrace_filter = Minitest::BacktraceFilter.new
 
-require "rails/test_unit/reporter"
-Rails::TestUnitReporter.executable = 'bin/test'
 
 # Load fixtures from the engine
 if ActiveSupport::TestCase.respond_to?(:fixture_path=)
