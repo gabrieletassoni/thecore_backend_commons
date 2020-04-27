@@ -28,4 +28,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'thecore_auth_commons', '~> 2.1'
 
   spec.add_dependency 'devise-i18n', "~> 1.5"
+  # Auto Locale
+  # A gem which helps you detect the users preferred language, as sent by the "Accept-Language" HTTP header.
+  # https://github.com/iain/http_accept_language
+  spec.add_dependency 'http_accept_language', "~> 2.1"
 end
