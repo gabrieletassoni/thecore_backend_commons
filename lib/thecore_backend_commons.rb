@@ -5,6 +5,8 @@ require 'devise-i18n'
 require 'http_accept_language'
 require 'rails-i18n'
 
+require 'patches/thecore'
+
 module ThecoreBackendCommons
   # Your code goes here...
 end
