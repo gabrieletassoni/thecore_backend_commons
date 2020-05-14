@@ -1,12 +1,12 @@
-require 'thecore_rails_admin_export_concern'
-require 'thecore_rails_admin_bulk_delete_concern'
+require 'patches/thecore_rails_admin_export_concern'
+require 'patches/thecore_rails_admin_bulk_delete_concern'
 
-require 'date_format'
+require 'patches/date_format'
 
-require 'string_extensions'
-require 'integer_extensions'
-require 'active_record_extensions'
+require 'patches/string_extensions'
+require 'patches/integer_extensions'
+require 'patches/active_record_extensions'
 
-require 'postgresql_drop_replacement'
+require 'patches/postgresql_drop_replacement'
 
-require 'application_record_loader'
+require 'patches/application_record_loader'

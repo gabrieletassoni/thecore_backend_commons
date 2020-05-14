@@ -6,6 +6,7 @@ require 'http_accept_language'
 require 'rails-i18n'
 
 require 'patches/thecore'
+require 'concerns/thecore_backend_commons_user'
 
 module ThecoreBackendCommons
   # Your code goes here...
