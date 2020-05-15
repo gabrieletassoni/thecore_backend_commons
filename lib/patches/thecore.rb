@@ -1,6 +1,3 @@
-require 'patches/thecore_rails_admin_export_concern'
-require 'patches/thecore_rails_admin_bulk_delete_concern'
-
 require 'patches/date_format'
 
 require 'patches/string_extensions'

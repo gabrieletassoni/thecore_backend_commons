@@ -22,8 +22,6 @@ Rails.application.configure do
         ActiveRecord::Base.send(:include, ActiveRecordExtensions)
         Integer.send(:include, FixnumConcern)
         String.send(:include, StringConcern)
-        RailsAdmin::Config::Actions::Export.send(:include, ExportConcern)
-        RailsAdmin::Config::Actions::BulkDelete.send(:include, BulkDeleteConcern)
         User.send(:include, ThecoreBackendCommonsUser)
     end
 end
