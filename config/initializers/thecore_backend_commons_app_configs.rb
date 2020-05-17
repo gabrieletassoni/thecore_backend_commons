@@ -11,13 +11,6 @@ Rails.application.configure do
     # AFTER INITIALIZE Good place to load things that must have a bit of initialization 
     # setup on order to work (and not be overrided).    
     config.after_initialize do
-        # In development be sure to load all the namespaces
-        # in order to have working reflection and meta-programming.
-        if Rails.env.development?
-            Rails.configuration.eager_load_namespaces.each(&:eager_load!) if Rails.version.to_i == 5 #Rails 5
-            Zeitwerk::Loader.eager_load_all if Rails.version.to_i >= 6 #Rails 6
-        end
-
         # include the extensions
         ActiveRecord::Base.send(:include, ActiveRecordExtensions)
         Integer.send(:include, FixnumConcern)
