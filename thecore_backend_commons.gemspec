@@ -33,4 +33,5 @@ Gem::Specification.new do |spec|
   # A gem which helps you detect the users preferred language, as sent by the "Accept-Language" HTTP header.
   # https://github.com/iain/http_accept_language
   spec.add_dependency 'http_accept_language', "~> 2.1"
+  spec.add_dependency "rails_admin_settings", "~> 1.5"
 end
