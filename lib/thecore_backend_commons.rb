@@ -7,6 +7,9 @@ require 'rails_admin_settings'
 require 'patches/thecore'
 require 'concerns/thecore_backend_commons_user'
 
+require 'roo'
+require 'roo-xls'
+
 require "thecore_backend_commons/engine"
 
 module ThecoreBackendCommons

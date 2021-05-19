@@ -34,4 +34,7 @@ Gem::Specification.new do |spec|
   # https://github.com/iain/http_accept_language
   spec.add_dependency 'http_accept_language', "~> 2.1"
   spec.add_dependency "rails_admin_settings", "~> 1.5"
+  # Gem to import from CSV, XLS, XLSX, etc.
+  spec.add_dependency "roo", "~> 2.8"
+  spec.add_dependency "roo-xls", "~> 1.2"
 end
