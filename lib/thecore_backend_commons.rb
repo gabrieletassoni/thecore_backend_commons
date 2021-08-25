@@ -2,7 +2,7 @@ require 'thecore_auth_commons'
 require 'devise-i18n'
 require 'http_accept_language'
 require 'rails-i18n'
-require 'rails_admin_settings'
+require 'thecore_settings'
 
 require 'patches/thecore'
 require 'concerns/thecore_backend_commons_user'
