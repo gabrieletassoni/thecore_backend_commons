@@ -15,3 +15,11 @@ require "thecore_backend_commons/engine"
 module ThecoreBackendCommons
   # Your code goes here...
 end
+
+module Thecore
+  class Seed
+    def self.save_setting ns, setting, value
+      Settings.ns(ns)[setting] = value if Settings.ns(ns)[setting].blank?
+    end
+  end
+end

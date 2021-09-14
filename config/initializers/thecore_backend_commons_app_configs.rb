@@ -8,6 +8,9 @@ Rails.application.configure do
         :Disk,
         root: Rails.root.join("storage")
     )
+    
+    # ActionMailer
+    config.action_mailer.delivery_method = :smtp
     # AFTER INITIALIZE Good place to load things that must have a bit of initialization 
     # setup on order to work (and not be overrided).    
     config.after_initialize do
