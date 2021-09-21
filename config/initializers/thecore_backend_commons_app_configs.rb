@@ -18,6 +18,5 @@ Rails.application.configure do
         ActiveRecord::Base.send(:include, ActiveRecordExtensions)
         Integer.send(:include, FixnumConcern)
         String.send(:include, StringConcern)
-        User.send(:include, ThecoreBackendCommonsUser)
     end
 end

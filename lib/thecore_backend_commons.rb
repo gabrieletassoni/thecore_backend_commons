@@ -5,7 +5,6 @@ require 'rails-i18n'
 require 'thecore_settings'
 
 require 'patches/thecore'
-require 'concerns/thecore_backend_commons_user'
 
 require 'roo'
 require 'roo-xls'
@@ -19,7 +18,11 @@ end
 module Thecore
   class Seed
     def self.save_setting ns, setting, value
-      Settings.ns(ns)[setting] = value if Settings.ns(ns)[setting].blank?
+      puts "Saving setting if nil #{ns}: #{setting} = #{value}"
+      if Settings.ns(ns)[setting].blank?
+        Settings.ns(ns)[setting] if value.blank?
+        Settings.ns(ns)[setting] = value unless value.blank?
+      end
     end
   end
 end

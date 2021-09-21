@@ -1,12 +1,13 @@
 puts "Loading ThecoreBackendCommons seeds"
-Settings.app_name = "The Core by Gabriele Tassoni"
+Thecore::Seed.save_setting :main, :app_name, "The Core by Gabriele Tassoni"
 
-Thecore::Seed.save_setting :smtp, :delivery_method, nil
-Thecore::Seed.save_setting :smtp, :from, nil
-Thecore::Seed.save_setting :smtp, :address, nil
-Thecore::Seed.save_setting :smtp, :port, nil
-Thecore::Seed.save_setting :smtp, :domain, nil
-Thecore::Seed.save_setting :smtp, :user_name, nil
-Thecore::Seed.save_setting :smtp, :password, nil
-Thecore::Seed.save_setting :smtp, :authentication, nil
-Thecore::Seed.save_setting :smtp, :enable_starttls_auto, nil
+puts "Loading ThecoreBackendCommons SMTP config"
+Thecore::Seed.save_setting :smtp, :delivery_method, ""
+Thecore::Seed.save_setting :smtp, :from, ""
+Thecore::Seed.save_setting :smtp, :address, ""
+Thecore::Seed.save_setting :smtp, :port, ""
+Thecore::Seed.save_setting :smtp, :domain, ""
+Thecore::Seed.save_setting :smtp, :user_name, ""
+Thecore::Seed.save_setting :smtp, :password, ""
+Thecore::Seed.save_setting :smtp, :authentication, ""
+Thecore::Seed.save_setting :smtp, :enable_starttls_auto, ""
