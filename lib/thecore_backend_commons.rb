@@ -24,5 +24,10 @@ module Thecore
         Settings.ns(ns)[setting] = value unless value.blank?
       end
     end
+
+    def self.delete_setting ns, setting
+      puts "Removing setting #{ns}: #{setting}"
+      ThecoreSettings::Setting.where(ns: ns, key: setting).destroy_all
+    end
   end
 end
