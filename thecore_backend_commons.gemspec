@@ -25,16 +25,20 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
 
-  spec.add_dependency 'thecore_auth_commons', '~> 2.4'
+  spec.add_dependency 'thecore_auth_commons', '~> 3.0'
   # Rails
-  spec.add_dependency 'rails-i18n', "~> 6.0"
-  spec.add_dependency 'devise-i18n', "~> 1.5"
+  # https://github.com/svenfuchs/rails-i18n
+  spec.add_dependency 'rails-i18n', "~> 7.0"
+  # https://github.com/tigrish/devise-i18n
+  spec.add_dependency 'devise-i18n', "~> 1.10"
   # Auto Locale
   # A gem which helps you detect the users preferred language, as sent by the "Accept-Language" HTTP header.
   # https://github.com/iain/http_accept_language
   spec.add_dependency 'http_accept_language', "~> 2.1"
-  spec.add_dependency "thecore_settings", "~> 2.0"
+  spec.add_dependency "thecore_settings", "~> 3.0"
   # Gem to import from CSV, XLS, XLSX, etc.
-  spec.add_dependency "roo", "~> 2.8"
+  # https://github.com/roo-rb/roo
+  spec.add_dependency "roo", "~> 2.9"
+  # https://github.com/roo-rb/roo-xls
   spec.add_dependency "roo-xls", "~> 1.2"
 end
