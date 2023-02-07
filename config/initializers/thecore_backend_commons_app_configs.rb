@@ -7,11 +7,10 @@ Rails.application.configure do
     config.time_zone = 'Rome'
     # Active Storage
     config.active_storage.configure :Disk, root: Rails.root.join("storage")
-    
     # ActionMailer
     config.action_mailer.delivery_method = :smtp
     # AFTER INITIALIZE Good place to load things that must have a bit of initialization 
-    # setup on order to work (and not be overrided).    
+    # setup on order to work (and not be overrided).
     config.after_initialize do
         # include the extensions
         ActiveRecord::Base.send(:include, ActiveRecordExtensions)
