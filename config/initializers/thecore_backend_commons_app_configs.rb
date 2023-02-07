@@ -1,13 +1,12 @@
 Rails.application.configure do
+    # Session Store
+    config.session_store :cookie_store, expire_after: 1.year, domain: ".#{ENV["BASE_DOMAIN"].presence || "all"}"
     # I18n
     config.i18n.available_locales = %w(it en)
     config.i18n.default_locale = :it
     config.time_zone = 'Rome'
     # Active Storage
-    config.active_storage.configure(
-        :Disk,
-        root: Rails.root.join("storage")
-    )
+    config.active_storage.configure :Disk, root: Rails.root.join("storage")
     
     # ActionMailer
     config.action_mailer.delivery_method = :smtp
