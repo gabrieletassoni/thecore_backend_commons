@@ -1,0 +1,18 @@
+en:
+  tiered_times:
+    dd:
+      zero: "0 Days"
+      one: "%{count} Day"
+      other: "%{count} Days"
+    hh:
+      zero: "0 Hours"
+      one: "%{count} Hour"
+      other: "%{count} Hours"
+    mm:
+      zero: "0 Minutes"
+      one: "%{count} Minute"
+      other: "%{count} Minutes"
+    ss:
+      zero: "0 Seconds"
+      one: "%{count} Second"
+      other: "%{count} Seconds"

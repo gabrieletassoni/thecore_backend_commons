@@ -8,7 +8,7 @@ How to use my plugin.
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'thecore_backend_commons'
+gem "thecore_backend_commons"
 ```
 
 And then execute:
