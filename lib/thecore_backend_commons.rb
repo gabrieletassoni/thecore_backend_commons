@@ -5,6 +5,9 @@ require 'devise-i18n'
 require 'http_accept_language'
 require "roo"
 require "roo-xls"
+require "active_storage_validations"
+require 'ulid'
+
 require "thecore_backend_commons/engine"
 
 module ThecoreBackendCommons

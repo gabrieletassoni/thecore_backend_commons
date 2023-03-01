@@ -39,4 +39,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "roo", "~> 2.9"
   # https://github.com/roo-rb/roo-xls
   spec.add_dependency "roo-xls", "~> 1.2"
+  # https://github.com/igorkasyanchuk/active_storage_validations
+  spec.add_dependency 'active_storage_validations', "~> 1.0"
+  # https://github.com/rafaelsales/ulid
+  spec.add_dependency 'ulid', '~> 1.3'
 end
