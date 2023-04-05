@@ -10,15 +10,23 @@ module ApplicationRecordConcern
     after_rollback :message_ko
 
     def validation_ko
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: false, errors: self.errors.full_messages.uniq, record: self}) if self.errors.any?
+      ActionCable.server.broadcast("messages", build_message(false, false, self.errors.full_messages.uniq)) if self.errors.any? && !is_model_forbidden
     end
 
     def message_ok
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: true, valid: true, errors: [], record: self})
+      ActionCable.server.broadcast("messages", build_message(true, true, [])) unless is_model_forbidden
     end
 
     def message_ko
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: true, errors: [], record: self})
+      ActionCable.server.broadcast("messages", build_message(false, true, [])) unless is_model_forbidden
+    end
+
+    def is_model_forbidden
+      [ 'User', 'Role' ].include?(self.class.name)
+    end
+
+    def build_message success, valid, errors
+      { topic: :record, action: detect_action, class: self.class.name, success: success, valid: valid, errors: errors, record: self}
     end
 
     def detect_action
