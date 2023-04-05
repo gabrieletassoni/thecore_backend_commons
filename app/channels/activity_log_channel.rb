@@ -7,10 +7,7 @@ class ActivityLogChannel < ApplicationCable::Channel
     # Any cleanup needed when channel is unsubscribed
   end
 
-  # https://cableready.stimulusreflex.com/troubleshooting/#verify-actioncable
-
   def receive(data)
-    puts data["message"]
-    ActionCable.server.broadcast("messages", "ActionCable is connected")
+    ActionCable.server.broadcast("messages", {message: "ActionCable is connected and received: #{data["message"]}", topic: data["topic"].presence || "general"}) if data["namespace"] == "subscriptions"
   end
 end
