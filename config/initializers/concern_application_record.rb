@@ -10,7 +10,7 @@ module ApplicationRecordConcern
     after_rollback :message_ko
 
     def validation_ko
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: false, errors: self.errors.full_messages, record: self}) if self.errors.any?
+      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: false, errors: self.errors.full_messages.uniq, record: self}) if self.errors.any?
     end
 
     def message_ok
