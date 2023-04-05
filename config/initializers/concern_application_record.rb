@@ -3,16 +3,22 @@ require 'active_support/concern'
 module ApplicationRecordConcern
   extend ActiveSupport::Concern
   included do
+    after_validation :validation_ko
+
     after_commit :message_ok
 
     after_rollback :message_ko
 
+    def validation_ko
+      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: false, errors: self.errors.full_messages, record: self}) if self.errors.any?
+    end
+
     def message_ok
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: true, record: self})
+      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: true, valid: true, errors: [], record: self})
     end
 
     def message_ko
-      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, record: self})
+      ActionCable.server.broadcast("messages", { topic: :record, action: detect_action, success: false, valid: true, errors: [], record: self})
     end
 
     def detect_action
