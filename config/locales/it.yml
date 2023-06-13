@@ -1,0 +1,18 @@
+it:
+  tiered_times:
+    dd:
+      zero: "0 Giorni"
+      one: "%{count} Giorno"
+      other: "%{count} Giorni"
+    hh:
+      zero: "0 Ore"
+      one: "%{count} Ora"
+      other: "%{count} Ore"
+    mm:
+      zero: "0 Minuti"
+      one: "%{count} Minuto"
+      other: "%{count} Minuti"
+    ss:
+      zero: "0 Secondi"
+      one: "%{count} Secondo"
+      other: "%{count} Secondi"

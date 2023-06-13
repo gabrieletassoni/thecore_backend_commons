@@ -1,4 +1,3 @@
-# .gsub(/[^A-Za-z0-9]/, " ").split.join("%")
 require 'active_support/concern'
 
 module StringConcern
