@@ -11,8 +11,10 @@ module CableConnectionConcern
 
     protected
 
-    def find_verified_user # this checks whether a user is authenticated with devise
-      m = request.query_parameters["token"]
+    def find_verified_user 
+      # this checks whether a user is authenticated with devise
+      # It looks for a token in the query parameters, or in the header
+      m = request.query_parameters["token"].presence || request.headers["Authorization"].split(" ").second.strip
 
       body = ::HashWithIndifferentAccess.new(::JWT.decode(m, ::Rails.application.credentials.dig(:secret_key_base).presence||ENV["SECRET_KEY_BASE"], false)[0]) rescue nil
       if verified_user = (env['warden'].user.presence || User.find_by(id: body[:user_id]))
