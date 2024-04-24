@@ -43,4 +43,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'active_storage_validations', "~> 1.0"
   # https://github.com/rafaelsales/ulid
   spec.add_dependency 'ulid', '~> 1.3'
+  # https://github.com/ruby/csv
+  spec.add_dependency 'csv', '~> 3.3'
 end
