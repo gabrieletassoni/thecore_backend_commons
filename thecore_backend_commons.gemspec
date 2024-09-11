@@ -23,7 +23,7 @@ Gem::Specification.new do |spec|
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
   end
 
-  spec.add_dependency 'thecore_auth_commons', '~> 3.0'
+  spec.add_dependency 'thecore_auth_commons', '~> 3.2'
   spec.add_dependency 'thecore_background_jobs', '~> 3.0'
   spec.add_dependency 'ostruct'
   # Rails
