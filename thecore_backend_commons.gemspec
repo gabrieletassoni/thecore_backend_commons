@@ -25,6 +25,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'thecore_auth_commons', '~> 3.0'
   spec.add_dependency 'thecore_background_jobs', '~> 3.0'
+  spec.add_dependency 'ostruct'
   # Rails
   # https://github.com/svenfuchs/rails-i18n
   spec.add_dependency 'rails-i18n', "~> 7.0"
