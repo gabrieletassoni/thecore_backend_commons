@@ -1,3 +1,4 @@
+require 'ostruct'
 require 'thecore_auth_commons'
 require 'thecore_background_jobs'
 require 'rails-i18n'
