@@ -10,6 +10,7 @@ require "active_storage_validations"
 require 'ulid'
 require 'csv'
 
+require "thecore_backend_commons/version"
 require "thecore_backend_commons/engine"
 
 module ThecoreBackendCommons
