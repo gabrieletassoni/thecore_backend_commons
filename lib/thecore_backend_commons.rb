@@ -1,14 +1,15 @@
-require 'ostruct'
-require 'thecore_auth_commons'
-require 'thecore_background_jobs'
-require 'rails-i18n'
-require 'devise-i18n'
-require 'http_accept_language'
+require "ostruct"
+require "thecore_auth_commons"
+require "thecore_background_jobs"
+require "rails-i18n"
+require "devise-i18n"
+require "http_accept_language"
 require "roo"
 require "roo-xls"
 require "active_storage_validations"
-require 'ulid'
-require 'csv'
+require "ulid"
+require "csv"
+require "seed_dump"
 
 require "thecore_backend_commons/version"
 require "thecore_backend_commons/engine"
