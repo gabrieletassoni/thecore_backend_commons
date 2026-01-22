@@ -1,14 +1,17 @@
 require "active_support/concern"
 
-module ApplicationRecordConcern
+module BaseApplicationRecordConcern
   extend ActiveSupport::Concern
   included do
+    # Add to all the models the ability to manage rich text content
+    has_rich_text :rich_content
+
     # Add to all the models the ability to manage attached assets with remove and append functionality
     has_many_attached :assets
 
     attr_accessor :remove_assets, :append_assets
 
-    after_save :manage_assets
+    after_commit :manage_assets
 
     # Broadcast messages via ActionCable for create, update, destroy actions
     after_validation :validation_ko
@@ -16,10 +19,30 @@ module ApplicationRecordConcern
     after_commit :message_ok
 
     after_rollback :message_ko
+
+    cattr_accessor :json_attrs
+    self.json_attrs = ::ModelDrivenApi.smart_merge (json_attrs || {}), {
+      methods: [:assets_paths, :rich_content_html],
+    }
   end
 
-  # Private methods
   private
+
+  def rich_content_html
+    rich_content&.body&.to_html
+  end
+
+  def assets_paths
+    # Returns the array of URLs for the assets attached to the project
+    assets.map do |asset|
+      {
+        id: asset.id,
+        filename: asset.filename.to_s,
+        content_type: asset.content_type,
+        url: Rails.application.routes.url_helpers.rails_blob_url(asset, only_path: true),
+      }
+    end
+  end
 
   def validation_ko
     ActionCable.server.broadcast("messages", build_message(false, false, self.errors.full_messages.uniq)) if self.errors.any? && !is_model_forbidden
@@ -34,6 +57,7 @@ module ApplicationRecordConcern
   end
 
   def is_model_forbidden
+    Rails.logger.debug("Checking if model #{self.class.name} is forbidden for ActionCable messages")
     ["User", "Role"].include?(self.class.name)
   end
 
