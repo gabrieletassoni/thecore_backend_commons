@@ -2,18 +2,18 @@ en:
   devise:
     failure:
       user:
-        invalid: Incorrect login credentials.
-        not_found_in_database: Incorrect login credentials.
+        invalid: Invalid credentials or password.
+        not_found_in_database: Invalid credentials or password.
     mailer:
       password_changed_instructions:
-        greeting: Welcome %{recipient}!
-        instruction: We sent you this email to inform about password change.
-        instruction_2: If you didn't changed password, we ask you to contact our customer service, please.
+        greeting: "Hello %{recipient}!"
+        instruction: We are sending this email to notify you that your password has been changed.
+        instruction_2: If you did not change your password, please contact our customer service immediately.
     shared:
       links:
         sign_out: Log out
       descriptions:
-        current_password_needed: (we need your current password to confirm your changes)
-        leave_blank: (leave blank if you don't want to change it)
+        current_password_needed: (your current password is required to confirm changes)
+        leave_blank: (leave blank if you do not want to change it)
     validations:
-      minimum_length: "%{length} characters minimum"
+      minimum_length: "minimum %{length} characters"
