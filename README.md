@@ -55,12 +55,20 @@ ThecoreBackendCommons::SmtpConfig.setting(:from)
 
 ### Testare la configurazione SMTP
 
-Dall'applicazione Rails che include questo gem, eseguire:
+Il gem espone `ThecoreBackendCommons::SmtpTester` e un rake task, disponibili automaticamente in qualsiasi app che include questo gem.
+
+**Da rake task (shell):**
 
 ```bash
-bundle exec rails runner script/test_smtp.rb destinatario@example.com
+rails thecore_backend_commons:smtp:test[destinatario@example.com]
 ```
 
-Se non si passa un indirizzo, l'email viene inviata all'indirizzo configurato in `ThecoreSettings mytask.default_email`.
+**Da Rails console:**
 
-Lo script stampa i parametri SMTP effettivamente usati (inclusi `tls` e `enable_starttls_auto`) prima di tentare la consegna, e restituisce exit code `1` in caso di errore con il messaggio dell'eccezione.
+```ruby
+ThecoreBackendCommons::SmtpTester.call("destinatario@example.com")
+```
+
+Se non si passa un indirizzo, in entrambi i casi viene usato `ThecoreSettings mytask.default_email`.
+
+Lo tester stampa i parametri SMTP effettivamente usati (inclusi `tls` e `enable_starttls_auto`) prima di tentare la consegna. Restituisce `true`/`false` dal console e exit code `1` dal rake task in caso di errore.
