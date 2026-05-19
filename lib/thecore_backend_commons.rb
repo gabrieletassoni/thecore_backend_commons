@@ -13,7 +13,7 @@ require "seed_dump"
 
 require "thecore_backend_commons/version"
 require "thecore_backend_commons/engine"
+require "thecore_backend_commons/smtp_config"
 
 module ThecoreBackendCommons
-  # Your code goes here...
 end
