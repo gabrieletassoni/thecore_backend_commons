@@ -1,3 +1,3 @@
 module ThecoreBackendCommons
-  VERSION = "3.2.11".freeze
+  VERSION = "3.3.0".freeze
 end

@@ -49,4 +49,7 @@ Gem::Specification.new do |spec|
   # Seed Dump: A gem to dump data from your database to db/seeds.rb
   # https://github.com/rroblak/seed_dump
   spec.add_dependency "seed_dump", "~> 3.4"
+  # Web Push notifications (VAPID support) — pushpad/web-push is the actively
+  # maintained fork of zaru/webpush with native OpenSSL 3.0 support.
+  spec.add_dependency "web-push", "~> 3.0"
 end

@@ -1,4 +1,5 @@
 require "ostruct"
+require "web-push" # gem for VAPID web push (pushpad/web-push, actively maintained)
 require "thecore_auth_commons"
 require "thecore_background_jobs"
 require "rails-i18n"
@@ -15,6 +16,7 @@ require "thecore_backend_commons/version"
 require "thecore_backend_commons/engine"
 require "thecore_backend_commons/smtp_config"
 require "thecore_backend_commons/smtp_tester"
+require "thecore_backend_commons/push_notification_service"
 
 module ThecoreBackendCommons
 end
