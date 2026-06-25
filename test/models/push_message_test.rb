@@ -64,4 +64,5 @@ class PushMessageTest < ActiveSupport::TestCase
     msg = PushMessage.create!(push_subscriber: @subscriber, title: "Hi", body: "Hello", sender: sender)
     assert_equal sender, msg.reload.sender
   end
+
 end

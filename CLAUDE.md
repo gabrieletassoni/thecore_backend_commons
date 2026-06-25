@@ -36,6 +36,8 @@ Key interface:
 - `subscriber.expire!` — sets `expired_at = Time.current`
 - `subscriber.push_messages` — `has_many :push_messages, dependent: :destroy`
 
+API serialization (`json_attrs`) and RailsAdmin configuration are applied from external gems: `model_driven_api` registers `json_attrs` with user data; `thecore_ui_rails_admin` registers rails_admin config. The model itself has no direct dependency on these gems.
+
 **`PushMessage`** (`app/models/push_message.rb`):
 Records a push notification payload tied to a `PushSubscriber`. Created before dispatch; `sent_at` is populated after successful delivery.
 
@@ -44,6 +46,8 @@ Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, req
 Associations: `belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true`. Note: `sender_user_id` identifies the *human sender*; `user_id` in `push_subscribers` identifies the *recipient* — do not confuse the two.
 
 Validations: `title` and `body` presence required.
+
+API serialization (`json_attrs`) and RailsAdmin configuration are applied from external gems following the Thecore ATOM isolation principle (see below).
 
 ### Channels
 
@@ -96,6 +100,17 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 - `20260616000001_create_push_subscribers` — creates `push_subscribers` table with unique index on `endpoint`
 - `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
 - `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
+
+## ATOM isolation principle
+
+`thecore_backend_commons` owns only core domain logic (models, channels, services). It has **no dependency** on `model_driven_api` or `rails_admin`. API serialization (`json_attrs`) and RailsAdmin configuration for `PushSubscriber` and `PushMessage` are injected by downstream gems via `after_initialize`:
+
+| Gem | What it injects | Where |
+|-----|----------------|-------|
+| `model_driven_api` | `ModelDrivenApiPushSubscriber` / `ModelDrivenApiPushMessage` (json_attrs) | `config/initializers/after_initialize_for_model_driven_api.rb` |
+| `thecore_ui_rails_admin` | `ThecoreUiRailsAdminPushSubscriberConcern` / `ThecoreUiRailsAdminPushMessageConcern` (rails_admin) | `config/initializers/after_initialize.rb` |
+
+`name` and `surname` are included in `only:` for the user/sender serialization — Rails `as_json` silently omits columns that don't exist on the model, so the serialization is safe across all environments.
 
 ## Test infrastructure
 

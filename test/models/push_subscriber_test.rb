@@ -51,4 +51,5 @@ class PushSubscriberTest < ActiveSupport::TestCase
     sub.expire!
     assert_not_nil sub.reload.expired_at
   end
+
 end
