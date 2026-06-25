@@ -52,4 +52,16 @@ class PushMessageTest < ActiveSupport::TestCase
       @subscriber.destroy
     end
   end
+
+  test "sender is optional" do
+    msg = PushMessage.new(push_subscriber: @subscriber, title: "Hi", body: "Hello")
+    assert msg.valid?
+    assert_nil msg.sender
+  end
+
+  test "sender can be set to a user" do
+    sender = User.create!(email: "sender@example.com", encrypted_password: BCrypt::Password.create("password123"))
+    msg = PushMessage.create!(push_subscriber: @subscriber, title: "Hi", body: "Hello", sender: sender)
+    assert_equal sender, msg.reload.sender
+  end
 end

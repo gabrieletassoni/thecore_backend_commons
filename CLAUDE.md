@@ -39,7 +39,9 @@ Key interface:
 **`PushMessage`** (`app/models/push_message.rb`):
 Records a push notification payload tied to a `PushSubscriber`. Created before dispatch; `sent_at` is populated after successful delivery.
 
-Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime).
+Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications).
+
+Associations: `belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true`. Note: `sender_user_id` identifies the *human sender*; `user_id` in `push_subscribers` identifies the *recipient* — do not confuse the two.
 
 Validations: `title` and `body` presence required.
 
@@ -93,6 +95,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 
 - `20260616000001_create_push_subscribers` — creates `push_subscribers` table with unique index on `endpoint`
 - `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
+- `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
 
 ## Test infrastructure
 
