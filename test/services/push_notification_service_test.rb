@@ -43,6 +43,27 @@ class PushNotificationServiceTest < ActiveSupport::TestCase
     end
   end
 
+  test "payload includes id, sent_at, and type" do
+    captured = nil
+    stub_send = ->(**kwargs) { captured = JSON.parse(kwargs[:message]) }
+    WebPush.stub(:payload_send, stub_send) do
+      ThecoreBackendCommons::PushNotificationService.dispatch(@subscriber, @message)
+    end
+    assert_equal @message.id, captured["id"]
+    assert_equal @message.created_at.iso8601, captured["sent_at"]
+    assert_equal "communication", captured["type"]
+  end
+
+  test "payload type reflects message_type field" do
+    @message.update!(message_type: "message")
+    captured = nil
+    stub_send = ->(**kwargs) { captured = JSON.parse(kwargs[:message]) }
+    WebPush.stub(:payload_send, stub_send) do
+      ThecoreBackendCommons::PushNotificationService.dispatch(@subscriber, @message)
+    end
+    assert_equal "message", captured["type"]
+  end
+
   # dispatch with ExpiredSubscription sets subscriber.expired_at
   test "dispatch with ExpiredSubscription expires the subscriber" do
     expired_error = WebPush::ExpiredSubscription.new(double_response(410), "endpoint")

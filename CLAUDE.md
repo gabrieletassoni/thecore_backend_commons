@@ -41,7 +41,7 @@ API serialization (`json_attrs`) and RailsAdmin configuration are applied from e
 **`PushMessage`** (`app/models/push_message.rb`):
 Records a push notification payload tied to a `PushSubscriber`. Created before dispatch; `sent_at` is populated after successful delivery.
 
-Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications).
+Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications), `message_type` (string, default `"communication"` — `"communication"` for general notifications, `"message"` for direct user messages).
 
 Associations: `belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true`. Note: `sender_user_id` identifies the *human sender*; `user_id` in `push_subscribers` identifies the *recipient* — do not confuse the two.
 
@@ -79,6 +79,7 @@ Include in ActionMailer subclasses to configure SMTP from `ThecoreSettings` at s
 Key interface:
 - `PushNotificationService.dispatch(subscriber, message)` — class-level entry point; sends the push, updates `message.sent_at` on success, calls `subscriber.expire!` on `Webpush::ExpiredSubscription` or `Webpush::InvalidSubscription`, prunes oldest messages if count exceeds `vapid.max_messages_per_subscriber` limit, and always returns `message`. Errors are rescued and logged; they do not propagate.
 - VAPID keys are read from `ThecoreSettings` (ns `:vapid`, keys `public_key`, `private_key`, `contact_email`) at dispatch time.
+- Push payload includes: `id` (PushMessage PK), `title`, `body`, `sent_at` (ISO 8601, from `created_at`), `type` (from `message_type`, default `"communication"`), `url`, `icon` (nil fields removed via `compact`).
 
 ## ThecoreSettings keys
 
@@ -100,6 +101,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 - `20260616000001_create_push_subscribers` — creates `push_subscribers` table with unique index on `endpoint`
 - `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
 - `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
+- `20260629000001_add_message_type_to_push_messages` — adds `message_type` string column (not null, default `"communication"`) to `push_messages`
 
 ## ATOM isolation principle
 

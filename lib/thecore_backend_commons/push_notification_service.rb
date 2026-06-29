@@ -36,7 +36,15 @@ module ThecoreBackendCommons
     end
 
     def payload
-      { title: @message.title, body: @message.body, url: @message.url, icon: @message.icon }.compact
+      {
+        id: @message.id,
+        title: @message.title,
+        body: @message.body,
+        sent_at: @message.created_at.iso8601,
+        type: @message.message_type,
+        url: @message.url,
+        icon: @message.icon
+      }.compact
     end
 
     def vapid_options
