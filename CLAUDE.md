@@ -65,6 +65,14 @@ Stream room name: `"push_notifications_subscriber_#{subscriber.id}"`
 
 Class method: `PushNotificationChannel.broadcast_to(subscriber, message)` — broadcasts `message.as_json` to the subscriber's room via `ActionCable.server.broadcast`.
 
+### Jobs
+
+**`PushDispatchJob`** (`app/jobs/push_dispatch_job.rb`):
+ActiveJob job that dispatches a single `PushMessage` via `PushNotificationService`. Enqueued by `Endpoints::PushSubscriber#send_push` (bulk path) — one job per subscriber.
+
+- Queue: `"#{ENV.fetch('COMPOSE_PROJECT_NAME', 'default')}_default"` — follows the Thecore/Spot COMPOSE_PROJECT_NAME convention.
+- `perform(push_message_id)` — loads the `PushMessage` by id (returns early if not found), then calls `ThecoreBackendCommons::PushNotificationService.dispatch(subscriber, message)`.
+
 ### Mailer concerns
 
 **`SmtpDeliverable`** (`app/mailers/concerns/smtp_deliverable.rb`):

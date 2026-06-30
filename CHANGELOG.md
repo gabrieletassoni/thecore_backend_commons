@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.4.0] - 2026-06-30
+
+### Added
+- **`PushDispatchJob`** (`app/jobs/push_dispatch_job.rb`) — ActiveJob for async Web Push dispatch. Loads a `PushMessage` by id, calls `ThecoreBackendCommons::PushNotificationService.dispatch(subscriber, message)`. Queue: `"#{ENV.fetch('COMPOSE_PROJECT_NAME', 'default')}_default"`. Enqueued by `Endpoints::PushSubscriber#send_push` (bulk path) and `#broadcast_push` — one job per subscriber.
+
 ## Unreleased
 
 ### Changed
