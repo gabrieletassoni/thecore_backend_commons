@@ -7,5 +7,7 @@ Rails.application.configure do
     ApplicationRecord.subclasses.each do |d|
       d.send(:include, BaseApplicationRecordConcern) unless d.name.start_with?("ActiveStorage::", "ActionText::")
     end
+
+    User.send(:include, ThecoreBackendCommonsUserConcern)
   end
 end
