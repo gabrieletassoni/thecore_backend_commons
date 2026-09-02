@@ -126,6 +126,39 @@ PushNotificationChannel.broadcast_to(subscriber, message)
 
 ---
 
+## `DefaultModuleRegistry` — shared `ApplicationRecord.inherited` hook
+
+Other gems in the ecosystem (`model_driven_api`, `thecore_ui_rails_admin`, ...) need to give
+*every* model some default behavior — a default API serialization shape, a default RailsAdmin
+navigation entry — without requiring a generated per-model concern file for the
+no-customization case. Rather than each gem independently overriding
+`ApplicationRecord.inherited` (and risking one override clobbering another), they all register
+into this one shared registry:
+
+```ruby
+ThecoreBackendCommons::DefaultModuleRegistry.register(
+  MyDefaultModule, # normally an ActiveSupport::Concern with an `included do ... end` block
+  applies_to: ->(klass) { true } # optional; defaults to every ApplicationRecord subclass
+)
+```
+
+Every registered module is `include`d, in registration order, into every `ApplicationRecord`
+subclass for which `applies_to` returns true — at the moment the subclass is *defined*, not via
+a post-boot scan (which would miss classes not yet autoloaded in development). This is wired up
+by installing an `ApplicationRecord.inherited` hook from `config.to_prepare` (see
+`config/initializers/default_module_registry.rb`), so it's already in place before Rails eager
+loads every model in production.
+
+Consumers today: `model_driven_api`'s `ModelDrivenApiDefaultJsonAttrs` (default `json_attrs`)
+and `thecore_ui_rails_admin`'s `ThecoreUiRailsAdminDefaultNavigationConcern` (default
+`navigation_label`/`navigation_icon`) — see their own READMEs for what each one does. A model
+that still needs custom behavior keeps (or adds) an explicit `Api::ModelName`/
+`RailsAdmin::ModelName` concern exactly as before; it simply runs *after* the default and
+overrides it. Full mechanics (idempotency, abstract/STI exclusion, `to_prepare` vs
+`after_initialize` timing) are documented in this gem's `CLAUDE.md`.
+
+---
+
 ## Invio email e configurazione SMTP
 
 ### Configurazione
