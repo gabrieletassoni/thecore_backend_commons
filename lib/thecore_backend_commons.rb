@@ -17,6 +17,7 @@ require "thecore_backend_commons/engine"
 require "thecore_backend_commons/smtp_config"
 require "thecore_backend_commons/smtp_tester"
 require "thecore_backend_commons/push_notification_service"
+require "thecore_backend_commons/default_module_registry"
 
 module ThecoreBackendCommons
 end
