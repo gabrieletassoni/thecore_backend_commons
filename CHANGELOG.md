@@ -5,7 +5,10 @@
 ### Added
 - **`PushDispatchJob`** (`app/jobs/push_dispatch_job.rb`) — ActiveJob for async Web Push dispatch. Loads a `PushMessage` by id, calls `ThecoreBackendCommons::PushNotificationService.dispatch(subscriber, message)`. Queue: `"#{ENV.fetch('COMPOSE_PROJECT_NAME', 'default')}_default"`. Enqueued by `Endpoints::PushSubscriber#send_push` (bulk path) and `#broadcast_push` — one job per subscriber.
 
-## Unreleased
+## [3.5.0] - 2026-09-02
+
+### Added
+- **`ThecoreBackendCommons::DefaultModuleRegistry`** (`lib/thecore_backend_commons/default_module_registry.rb`) — shared `ApplicationRecord.inherited` hook other gems register default modules into, so behavior lands on every subclass as it's defined instead of each gem independently patching `inherited` or scanning `ApplicationRecord.subclasses` post-boot (which misses classes not yet autoloaded in development). Installed from `config.to_prepare` (before `eager_load!`), idempotent across class reloads, excludes abstract/STI classes. See CLAUDE.md for full detail; `model_driven_api`'s `ModelDrivenApiDefaultJsonAttrs` and `thecore_ui_rails_admin`'s `ThecoreUiRailsAdminDefaultNavigationConcern` are its first two registrants.
 
 ### Changed
 - **Replaced `webpush` (abandoned, last release 2020) with `web-push ~> 3.0`** (pushpad fork, actively maintained, native OpenSSL 3.0 support). All `Webpush` references updated to `WebPush`. No monkey-patch needed — web-push 3.x handles OpenSSL 3.0 natively. Required bumping `jwt` dependency to `>= 2.4` in `model_driven_api` (web-push 3.x requires jwt ~> 3.0; jwt 3.x is backward compatible with existing `JWT.encode`/`JWT.decode` usage).
