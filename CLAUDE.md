@@ -154,7 +154,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 - `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
 - `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
 - `20260629000001_add_message_type_to_push_messages` — adds `message_type` string column (not null, default `"communication"`) to `push_messages`
-- `20260908000001_add_time_zone_columns_to_push_messages` — adds `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` string columns to `push_messages`
+- `20260908000010_add_time_zone_columns_to_push_messages` — adds `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` string columns to `push_messages` (version deliberately picked past `mytask`'s own `2026090800000{1..9}` range — engine migration versions share one `schema_migrations` table across the whole host app, so they must be globally unique, not just unique within this gem)
 
 ## ATOM isolation principle
 
