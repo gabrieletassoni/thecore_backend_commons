@@ -156,3 +156,5 @@ The dummy app (`test/dummy/`) uses SQLite3. Key stubs in `test/dummy/config/appl
 - `config.assets` stub (sprockets not in bundle)
 - `User`, `Ability`, `ApplicationCable::Connection` preloaded before `run_load_hooks`
 - `has_rich_text` stubbed via `ActiveSupport.on_load(:active_record)`
+
+**Convention for any gem consuming this one**: `config/initializers/application_config.rb` unconditionally sets `config.assets.prefix` at boot — every downstream gem's own dummy test app hits this the moment it eager-loads far enough to run this initializer, since `config.assets` doesn't exist unless a Sprockets/Propshaft railtie is loaded. Do **not** add a real `sprockets-rails` dependency just to satisfy this one line — stub `config.assets` the same way this file and `thecore_ui_rails_admin`'s dummy app do (a `method_missing`-based stub prepended onto `Rails::Application::Configuration`). Confirmed working in `thecore_download_documents` and `thecore-spot-overrides`'s own dummy apps.

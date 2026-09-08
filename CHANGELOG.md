@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.5.1] - 2026-09-08
+
+### Fixed
+- Pinned `json < 3.0` in the dev `Gemfile` — json 3.0+ turns ActiveSupport's `quirks_mode:` `JSON.generate` option into a hard `ArgumentError` under Rails 7.2 (test/dev tooling only, does not affect the published gem). Added a "Convention for any gem consuming this one" note to CLAUDE.md pointing any future gem hitting the `config.assets` boot crash at the existing stub pattern instead of a real `sprockets-rails` dependency.
+
 ## [3.4.0] - 2026-06-30
 
 ### Added
