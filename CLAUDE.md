@@ -41,7 +41,7 @@ API serialization (`json_attrs`) and RailsAdmin configuration are applied from e
 **`PushMessage`** (`app/models/push_message.rb`):
 Records a push notification payload tied to a `PushSubscriber`. Created before dispatch; `sent_at` is populated after successful delivery.
 
-Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications), `message_type` (string, default `"communication"` — `"communication"` for general notifications, `"message"` for direct user messages).
+Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications), `message_type` (string, default `"communication"` — `"communication"` for general notifications, `"message"` for direct user messages). Declares `sent_at`/`received_at`/`read_at` through `TimeZoneAware` (see below), gaining `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` columns.
 
 Associations: `belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true`. Note: `sender_user_id` identifies the *human sender*; `user_id` in `push_subscribers` identifies the *recipient* — do not confuse the two.
 
@@ -88,6 +88,24 @@ Key interface:
 - `PushNotificationService.dispatch(subscriber, message)` — class-level entry point; sends the push, updates `message.sent_at` on success, calls `subscriber.expire!` on `Webpush::ExpiredSubscription` or `Webpush::InvalidSubscription`, prunes oldest messages if count exceeds `vapid.max_messages_per_subscriber` limit, and always returns `message`. Errors are rescued and logged; they do not propagate.
 - VAPID keys are read from `ThecoreSettings` (ns `:vapid`, keys `public_key`, `private_key`, `contact_email`) at dispatch time.
 - Push payload includes: `id` (PushMessage PK), `title`, `body`, `sent_at` (ISO 8601, from `created_at`), `type` (from `message_type`, default `"communication"`), `url`, `icon` (nil fields removed via `compact`).
+
+### Time-zone-aware datetime fields (`TimeZoneAware`)
+
+`app/models/concerns/time_zone_aware.rb` provides a class-level DSL, `time_zone_aware(*fields)`, that any model can call on its own UTC datetime fields to expose them three ways in JSON — the raw UTC instant, the same instant localized to the deployment-wide server time zone Setting, and localized to the record's own per-field time zone (falling back to the server Setting when unset). Implements the relevant part of `docs/adr/0009-timezone-aware-datetime-representation.md` (host repo).
+
+This concern originated in the host app's `mytask` gem (a customer-specific "spot" gem) but was relocated here in `thecore_backend_commons` 3.6.0 when `PushMessage` (which lives in this gem) needed the same mechanism for its `sent_at`/`received_at`/`read_at` fields (issue #28, host repo) — `mytask` cannot be a dependency of this gem (wrong direction: this is the generic, ecosystem-wide base gem; `mytask` is IMAS/Bancolini-specific), so the DSL now lives at the lower, shared point in the dependency graph. `mytask` in turn gained a gemspec dependency on this gem (`~> 3.6`) and dropped its own copy, calling this one instead — its own model declarations (`Task`/`Project`/`TimeTable`/`Report`/etc.) are unchanged.
+
+For each declared `field`:
+
+- The migration must already have added a nullable `<field>_time_zone` string column.
+- A `validate` rejects a non-blank `<field>_time_zone` that isn't a valid IANA identifier (via `ActiveSupport::TimeZone[value]`).
+- Two instance methods are defined: `<field>_server_tz` and `<field>_record_tz` (see above).
+- Both are merged into the model's `json_attrs[:methods]` via `ModelDrivenApi.smart_merge` — same as `BaseApplicationRecordConcern` above, this is an unconditional reference to `::ModelDrivenApi`, not a soft dependency; any host/dummy app without the real `model_driven_api` gem loaded needs the same kind of stub `test/dummy/config/application.rb` already defines for `BaseApplicationRecordConcern`'s own identical call.
+- `TimeZoneAware.localize`/`.server_time_zone` are NULL-safe: a `nil` field value returns `nil`; a blank/invalid/absent zone returns the bare UTC value unshifted.
+
+Declared on: `PushMessage`'s `sent_at`/`received_at`/`read_at` (this gem). `mytask` declares it on `Task`/`Project`, `TimeTable`/`FreeTimeTable`, `Report`/`FreeReport`, `Assignment`, `Milestone`, `Unavailability` — see that gem's own CLAUDE.md.
+
+Test coverage: `test/models/push_message_test.rb`'s "time-zone awareness" section — record zone present/different from server, `NULL` fallback, invalid zone rejected.
 
 ### `ThecoreBackendCommons::DefaultModuleRegistry` (`lib/thecore_backend_commons/default_module_registry.rb`)
 
@@ -136,6 +154,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 - `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
 - `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
 - `20260629000001_add_message_type_to_push_messages` — adds `message_type` string column (not null, default `"communication"`) to `push_messages`
+- `20260908000001_add_time_zone_columns_to_push_messages` — adds `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` string columns to `push_messages`
 
 ## ATOM isolation principle
 
@@ -147,6 +166,8 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 | `thecore_ui_rails_admin` | `ThecoreUiRailsAdminPushSubscriberConcern` / `ThecoreUiRailsAdminPushMessageConcern` (rails_admin) | `config/initializers/after_initialize.rb` |
 
 `name` and `surname` are included in `only:` for the user/sender serialization — Rails `as_json` silently omits columns that don't exist on the model, so the serialization is safe across all environments.
+
+**Caveat**: "no dependency" means no gemspec dependency (this gem never `add_dependency "model_driven_api"`), not zero reference to the constant. `BaseApplicationRecordConcern` (included in every model by default via `DefaultModuleRegistry`) and `TimeZoneAware` (see above) both call `::ModelDrivenApi.smart_merge` directly and unconditionally when populating `json_attrs` — a host/dummy app that loads this gem without the real `model_driven_api` gem must define a same-shaped `ModelDrivenApi.smart_merge` stub (see this gem's own `test/dummy/config/application.rb`) or model boot fails with `NameError`.
 
 ## Test infrastructure
 

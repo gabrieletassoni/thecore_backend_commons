@@ -1,4 +1,8 @@
 class PushMessage < ApplicationRecord
+  include TimeZoneAware
+
+  time_zone_aware :sent_at, :received_at, :read_at
+
   belongs_to :push_subscriber
   belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true
   validates :title, presence: true

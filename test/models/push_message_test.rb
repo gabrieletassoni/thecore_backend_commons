@@ -65,4 +65,44 @@ class PushMessageTest < ActiveSupport::TestCase
     assert_equal sender, msg.reload.sender
   end
 
+  # --- time-zone awareness (TimeZoneAware, issue #28) ---
+
+  def set_server_time_zone(value)
+    ThecoreSettings::Setting.where(ns: :main, key: :time_zone).destroy_all
+    Settings.unload!
+    Settings.ns(:main).time_zone = value if value
+  end
+
+  test "sent_at_record_tz, received_at_record_tz, and read_at_record_tz localize independently" do
+    set_server_time_zone("Europe/Rome")
+    now = Time.current
+    msg = PushMessage.create!(
+      push_subscriber: @subscriber, title: "Hi", body: "Hello",
+      sent_at: now, received_at: now, read_at: now,
+      sent_at_time_zone: "Europe/Rome",
+      received_at_time_zone: "America/Santiago",
+      read_at_time_zone: nil
+    )
+
+    assert_equal "Europe/Rome", msg.sent_at_record_tz.time_zone.name
+    assert_equal "America/Santiago", msg.received_at_record_tz.time_zone.name
+    assert_equal "Europe/Rome", msg.read_at_record_tz.time_zone.name # falls back to server zone
+  end
+
+  test "sent_at_server_tz localizes to the server zone regardless of the record's own zone" do
+    set_server_time_zone("Europe/Rome")
+    msg = PushMessage.create!(
+      push_subscriber: @subscriber, title: "Hi", body: "Hello",
+      sent_at: Time.current, sent_at_time_zone: "America/Santiago"
+    )
+
+    assert_equal "Europe/Rome", msg.sent_at_server_tz.time_zone.name
+  end
+
+  test "an invalid sent_at_time_zone is rejected on save" do
+    msg = PushMessage.new(push_subscriber: @subscriber, title: "Hi", body: "Hello", sent_at_time_zone: "Not/AZone")
+
+    assert_not msg.valid?
+    assert_not_empty msg.errors[:sent_at_time_zone]
+  end
 end
