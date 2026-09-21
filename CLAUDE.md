@@ -133,6 +133,10 @@ Both compose safely with an explicit per-model concern: since `ApplicationRecord
 
 See `test/lib/thecore_backend_commons/default_module_registry_test.rb` for coverage of registration/application order, `applies_to` filtering, abstract/STI exclusion, `super` composition, and double-registration.
 
+## Framework-imposed host app config (`config/initializers/application_config.rb`)
+
+Settings this gem sets unconditionally on every consuming app, with no per-app opt-out — see `CONTEXT.md` for the "framework-imposed convention vs. app-owned choice" vocabulary and `docs/adr/0001-active-job-queue-adapter-is-framework-imposed.md` for the reasoning and full precedent list: `config.relative_url_root`, `config.assets.prefix`, `config.active_storage` disk config, `config.action_mailer.delivery_method = :smtp`, `config.action_cable.allowed_request_origins`, and — production only — `config.active_job.queue_adapter = :sidekiq` (development/test stay on Rails' `:async` default). An app that genuinely needs a different production queue adapter must override it explicitly, after this initializer runs.
+
 ## ThecoreSettings keys
 
 ### SMTP (ns: `:smtp`)
