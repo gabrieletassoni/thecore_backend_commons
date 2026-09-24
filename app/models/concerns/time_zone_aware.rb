@@ -24,7 +24,7 @@ module TimeZoneAware
         end
 
         cattr_accessor :json_attrs unless respond_to?(:json_attrs)
-        self.json_attrs = ::ModelDrivenApi.smart_merge(json_attrs || {}, {
+        self.json_attrs = ::ThecoreBackendCommons.smart_merge(json_attrs || {}, {
           methods: [:"#{field}_server_tz", :"#{field}_record_tz"],
         })
       end

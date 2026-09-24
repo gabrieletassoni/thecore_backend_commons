@@ -26,6 +26,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "thecore_auth_commons", "~> 3.2"
   spec.add_dependency "thecore_background_jobs", "~> 3.0"
   spec.add_dependency "ostruct"
+  # ThecoreBackendCommons.smart_merge (json_attrs composition), moved here from model_driven_api
+  spec.add_dependency "deep_merge", "~> 1.2"
   # Rails
   # https://github.com/svenfuchs/rails-i18n
   spec.add_dependency "rails-i18n", "~> 7.0"

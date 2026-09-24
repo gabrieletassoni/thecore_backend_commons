@@ -103,7 +103,7 @@ For each declared `field`:
 - The migration must already have added a nullable `<field>_time_zone` string column.
 - A `validate` rejects a non-blank `<field>_time_zone` that isn't a valid IANA identifier (via `ActiveSupport::TimeZone[value]`).
 - Two instance methods are defined: `<field>_server_tz` and `<field>_record_tz` (see above).
-- Both are merged into the model's `json_attrs[:methods]` via `ModelDrivenApi.smart_merge` — same as `BaseApplicationRecordConcern` above, this is an unconditional reference to `::ModelDrivenApi`, not a soft dependency; any host/dummy app without the real `model_driven_api` gem loaded needs the same kind of stub `test/dummy/config/application.rb` already defines for `BaseApplicationRecordConcern`'s own identical call.
+- Both are merged into the model's `json_attrs[:methods]` via `ThecoreBackendCommons.smart_merge` (defined in `lib/thecore_backend_commons.rb`, `deep_merge`-based) — same as `BaseApplicationRecordConcern` above. Until 3.8.0 both called `::ModelDrivenApi.smart_merge`, an upward reference to a gem that depends on this one, which crashed with `NameError` in any app without `model_driven_api` (the dummy app hid it with a stub whose shallow-merge semantics even differed from the real one). `ModelDrivenApi.smart_merge` now delegates here; covered by `test/lib/smart_merge_test.rb`, and the dummy app has no stub any more.
 - `TimeZoneAware.localize`/`.server_time_zone` are NULL-safe: a `nil` field value returns `nil`; a blank/invalid/absent zone returns the bare UTC value unshifted.
 
 Declared on: `PushMessage`'s `sent_at`/`received_at`/`read_at` (this gem). `mytask` declares it on `Task`/`Project`, `TimeTable`/`FreeTimeTable`, `Report`/`FreeReport`, `Assignment`, `Milestone`, `Unavailability` — see that gem's own CLAUDE.md.
@@ -174,7 +174,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 
 `name` and `surname` are included in `only:` for the user/sender serialization — Rails `as_json` silently omits columns that don't exist on the model, so the serialization is safe across all environments.
 
-**Caveat**: "no dependency" means no gemspec dependency (this gem never `add_dependency "model_driven_api"`), not zero reference to the constant. `BaseApplicationRecordConcern` (included in every model by default via `DefaultModuleRegistry`) and `TimeZoneAware` (see above) both call `::ModelDrivenApi.smart_merge` directly and unconditionally when populating `json_attrs` — a host/dummy app that loads this gem without the real `model_driven_api` gem must define a same-shaped `ModelDrivenApi.smart_merge` stub (see this gem's own `test/dummy/config/application.rb`) or model boot fails with `NameError`.
+**No upward references**: this gem never references `::ModelDrivenApi` (which depends on it). `json_attrs` composition uses this gem's own `ThecoreBackendCommons.smart_merge`; `ModelDrivenApi.smart_merge` delegates to it. Before 3.8.0 `BaseApplicationRecordConcern` and `TimeZoneAware` called `::ModelDrivenApi.smart_merge` directly, so a host/dummy app without `model_driven_api` failed model boot with `NameError` unless it defined a stub.
 
 ## Test infrastructure
 

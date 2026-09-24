@@ -26,15 +26,6 @@ Rails::Application::Configuration.prepend(Module.new do
   end
 end)
 
-# Stub ModelDrivenApi.smart_merge — model_driven_api is not in this gem's bundle.
-# BaseApplicationRecordConcern (from thecore_backend_commons) calls ::ModelDrivenApi.smart_merge
-# in its included block when models are initialized in after_initialize.
-module ModelDrivenApi
-  def self.smart_merge(base, additions)
-    base.merge(additions) { |_, a, b| a.is_a?(Array) && b.is_a?(Array) ? (a + b).uniq : b }
-  end
-end
-
 Bundler.require(*Rails.groups)
 require "thecore_backend_commons"
 

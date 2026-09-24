@@ -21,7 +21,7 @@ module BaseApplicationRecordConcern
     after_rollback :message_ko
 
     cattr_accessor :json_attrs
-    self.json_attrs = ::ModelDrivenApi.smart_merge (json_attrs || {}), {
+    self.json_attrs = ::ThecoreBackendCommons.smart_merge (json_attrs || {}), {
       methods: [:assets_paths, :rich_content_html],
     }
   end
