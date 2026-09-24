@@ -10,7 +10,7 @@ gemspec
 # until Rails 8 ships a compatible activesupport release.
 gem 'json', '< 3.0'
 
-gem "sqlite3"
+gem "pg"
 gem "rails", "~> 7.2"
 gem "web-push", "~> 3.0"
 

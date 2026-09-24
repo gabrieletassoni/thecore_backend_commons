@@ -6,16 +6,19 @@ Rails engine gem providing shared backend utilities for the Thecore ecosystem: A
 
 ```bash
 # Run tests (from inside the submodule directory)
-env -u DATABASE_URL BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib test/models/push_subscriber_test.rb
+BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib test/models/push_subscriber_test.rb
 
 # Run all tests
-env -u DATABASE_URL BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib -e "Dir['test/**/*_test.rb'].each { |f| require_relative f }"
+BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib -e "Dir['test/**/*_test.rb'].each { |f| require_relative f }"
 
 # Bundle install
 BUNDLE_GEMFILE=Gemfile bundle install
+
+# One-time: create the Postgres test database (from test/dummy/)
+BUNDLE_GEMFILE=../../Gemfile RAILS_ENV=test bundle exec bin/rails db:create
 ```
 
-**Important**: always unset `DATABASE_URL` when running tests — the devcontainer environment sets it to a PostgreSQL URL that overrides the test SQLite3 config.
+No need to unset `DATABASE_URL`: the dummy app's `config/boot.rb` rewrites its database name (see Test infrastructure).
 
 ## Architecture
 
@@ -175,7 +178,7 @@ Keys are generated automatically at `db:seed` if absent. **Regenerating keys inv
 
 ## Test infrastructure
 
-The dummy app (`test/dummy/`) uses SQLite3. Key stubs in `test/dummy/config/application.rb`:
+The dummy app (`test/dummy/`) runs on **PostgreSQL only** — like every Thecore gem and host app (this gem uses Postgres-specific SQL; never SQLite). `test/dummy/config/database.yml` uses `adapter: postgresql` (host/port/user/password from `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`, defaulting to `db`/`5432`/`postgres`/`postgres`) with databases `thecore_backend_commons_{development,test,production}`. Because `DATABASE_URL` overrides `database.yml` and the devcontainer points it at the host app's dev DB (which the schema load, `force: :cascade`, or `db:test:prepare` would clobber), `test/dummy/config/boot.rb` keeps `DATABASE_URL`'s server/credentials but swaps its database name to `thecore_backend_commons_<RAILS_ENV>` — done in boot.rb rather than the test helper so every entry point (`bin/rails db:*`, Rails' `db:test:prepare` subprocess) is covered. Create the test DB once with `RAILS_ENV=test bin/rails db:create` (see Commands). Key stubs in `test/dummy/config/application.rb`:
 - `ModelDrivenApi.smart_merge` stub (model_driven_api not in bundle)
 - `config.action_mailbox` stub (not in rails/all)
 - `config.assets` stub (sprockets not in bundle)
