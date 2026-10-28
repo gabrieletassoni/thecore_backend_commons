@@ -138,7 +138,7 @@ See `test/lib/thecore_backend_commons/default_module_registry_test.rb` for cover
 
 ## Framework-imposed host app config (`config/initializers/application_config.rb`)
 
-Settings this gem sets unconditionally on every consuming app, with no per-app opt-out — see `CONTEXT.md` for the "framework-imposed convention vs. app-owned choice" vocabulary and `docs/adr/0001-active-job-queue-adapter-is-framework-imposed.md` for the reasoning and full precedent list: `config.relative_url_root`, `config.assets.prefix`, `config.active_storage` disk config, `config.action_mailer.delivery_method = :smtp`, `config.action_cable.allowed_request_origins`, and — production only — `config.active_job.queue_adapter = :sidekiq` (development/test stay on Rails' `:async` default). An app that genuinely needs a different production queue adapter must override it explicitly, after this initializer runs.
+Settings this gem sets unconditionally on every consuming app, with no per-app opt-out — see `GLOSSARY.md` for the "framework-imposed convention vs. app-owned choice" vocabulary and `docs/adr/0001-active-job-queue-adapter-is-framework-imposed.md` for the reasoning and full precedent list: `config.relative_url_root`, `config.assets.prefix`, `config.active_storage` disk config, `config.action_mailer.delivery_method = :smtp`, `config.action_cable.allowed_request_origins`, and — production only — `config.active_job.queue_adapter = :sidekiq` (development/test stay on Rails' `:async` default). An app that genuinely needs a different production queue adapter must override it explicitly, after this initializer runs.
 
 ## ThecoreSettings keys
 
@@ -186,3 +186,52 @@ The dummy app (`test/dummy/`) runs on **PostgreSQL only** — like every Thecore
 - `has_rich_text` stubbed via `ActiveSupport.on_load(:active_record)`
 
 **Convention for any gem consuming this one**: `config/initializers/application_config.rb` unconditionally sets `config.assets.prefix` at boot — every downstream gem's own dummy test app hits this the moment it eager-loads far enough to run this initializer, since `config.assets` doesn't exist unless a Sprockets/Propshaft railtie is loaded. Do **not** add a real `sprockets-rails` dependency just to satisfy this one line — stub `config.assets` the same way this file and `thecore_ui_rails_admin`'s dummy app do (a `method_missing`-based stub prepended onto `Rails::Application::Configuration`). Confirmed working in `thecore_download_documents` and `thecore-spot-overrides`'s own dummy apps.
+
+## Security scanning
+
+Configured in the GitHub repository settings, not in files:
+
+- **CodeQL** default setup (Ruby, the Actions workflows, and JavaScript/TypeScript where the gem
+  ships any): on every push to `release/3`, on pull requests and weekly. Findings: Security → Code
+  scanning.
+- **Secret scanning with push protection**: a push containing a recognised secret is rejected. It
+  is the only check that blocks anything. If it fires on a real secret, remove it from the commit and
+  rotate the secret; never bypass it.
+- **Dependabot alerts and security updates**, but no `dependabot.yml`, so no routine version-bump
+  pull requests. This gem commits no `Gemfile.lock`, so Dependabot only sees the gemspec and the
+  workflow Actions: CVEs in the resolved Ruby dependencies are caught by `bundler-audit` in the host
+  apps' pipelines, whose `Gemfile.lock` resolves every ATOM.
+- Findings never block a release: GitHub notifies the owner. When one needs work, open a GitHub
+  issue (see Agent skills).
+
+## Agent skills
+
+### Issue tracker
+
+Tasks, issues, bugs, tickets and specs for this repository live **only** in its GitHub Issues
+(`gabrieletassoni/thecore_backend_commons`), handled with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+**Mandatory rule.** Whenever a skill or development work creates, reads, updates, comments on,
+assigns, blocks or closes a task, issue, bug, ticket or spec (for example /to-tickets, /to-spec,
+/triage, /wayfinder, /implement, /diagnosing-bugs, /code-review, closing a piece of work, a bug found
+during a session), do it in this repository's GitHub Issues following `docs/agents/issue-tracker.md`.
+Never use Odoo, `.scratch/` or local Markdown files as a tracker: Odoo is only for the repositories
+on Bancolini's GitLab. `#123` means a GitHub issue number of this repository. If `gh` doesn't work,
+stop and say so instead of falling back to another tracker.
+
+### Triage labels
+
+The five canonical triage roles map to GitHub labels with the same name (`needs-triage`,
+`needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root, created lazily when the first
+term or decision is resolved. See `docs/agents/domain.md`.
+
+### Skills
+
+Matt Pocock's skills come from the `mattpocock-skills` Claude Code plugin installed on the
+developer's **host** (`claude plugins install mattpocock-skills`, official marketplace), never
+vendored here: no `.agents/skills/`, `.claude/commands/` or `skills-lock.json`. Its `ask-matt` skill
+maps how the skills connect.

@@ -13,5 +13,5 @@ Rails.application.config.action_cable.allowed_request_origins = [/http:\/\/*/, /
 # and mounts Sidekiq::Web unconditionally (thecore_background_jobs), so ActiveJob should actually
 # route through it rather than defaulting to Rails' in-process :async, which silently drops any
 # job in flight when its process restarts. Production only: :async remains the default in
-# development/test so neither requires a reachable Redis. See docs/adr/0001, CONTEXT.md.
+# development/test so neither requires a reachable Redis. See docs/adr/0001, GLOSSARY.md.
 Rails.application.config.active_job.queue_adapter = :sidekiq if Rails.env.production?

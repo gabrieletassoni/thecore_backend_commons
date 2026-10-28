@@ -8,7 +8,7 @@ We looked for precedent before deciding this belonged here rather than being ask
 
 `thecore_background_jobs` (a transitive dependency of this gem) goes further still: it already hard-`require`s `sidekiq`/`sidekiq-scheduler`/`sidekiq-failures` and unconditionally mounts `Sidekiq::Web` at `/sidekiq` in its own routes, and sets several ActiveJob-queue-adjacent settings (`deliver_later_queue_name`, ActiveStorage/ActionMailbox queue names). Every consumer of this gem was already committed to running Sidekiq before this change — `queue_adapter` was the one missing line that made none of that infrastructure actually get used.
 
-We therefore add `Rails.application.config.active_job.queue_adapter = :sidekiq` to `application_config.rb`, guarded by `Rails.env.production?` only — development and test stay on `:async`, since neither should require a reachable Redis, and forcing real Sidekiq into test suites changes how job assertions have to be written for every consumer, which is a much bigger and more disruptive imposition than this ADR is trying to make. See `CONTEXT.md` for the general "framework-imposed convention vs. app-owned choice" vocabulary this decision instantiates.
+We therefore add `Rails.application.config.active_job.queue_adapter = :sidekiq` to `application_config.rb`, guarded by `Rails.env.production?` only — development and test stay on `:async`, since neither should require a reachable Redis, and forcing real Sidekiq into test suites changes how job assertions have to be written for every consumer, which is a much bigger and more disruptive imposition than this ADR is trying to make. See `GLOSSARY.md` for the general "framework-imposed convention vs. app-owned choice" vocabulary this decision instantiates.
 
 ## Considered Options
 
