@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.9.0] - 2026-10-28
+
+### Changed
+- **`roo ~> 3.0` and `roo-xls ~> 2.0`** (were `~> 2.9`/`~> 1.2`). roo 2.x pinned `rubyzip < 3.0`, and rubyzip 2.4.1 has a High path traversal (CVE-2026-85396, GHSA-47m2-wp7j-p9vc) fixed only in `>= 3.4.0`; roo 3 moves to rubyzip 3. roo 4 is not taken yet because roo-xls 2.0 still requires `roo < 4`. `Roo::Spreadsheet.open(...).sheet(0).parse(headers: true, clean: true)` (what the spot items importer calls) returns the same rows on both versions for `.xlsx` and `.xls`: `test/lib/spreadsheet_import_test.rb`.
+
 ## [3.5.1] - 2026-09-08
 
 ### Fixed

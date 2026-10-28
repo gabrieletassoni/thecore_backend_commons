@@ -24,7 +24,7 @@ No need to unset `DATABASE_URL`: the dummy app's `config/boot.rb` rewrites its d
 
 ### Entry point
 
-`lib/thecore_backend_commons.rb` — requires all dependencies including `webpush` (for VAPID push notifications).
+`lib/thecore_backend_commons.rb` — requires all dependencies including `web-push` (for VAPID push notifications) and `roo`/`roo-xls` (spreadsheet import, used by the spot items importer). roo is `~> 3.0` since 3.9.0 so the bundle can take rubyzip >= 3.4 (CVE-2026-85396); roo 4 waits for a roo-xls that allows it. `test/lib/spreadsheet_import_test.rb` checks `.xlsx`/`.xls` parsing.
 
 ### Models
 

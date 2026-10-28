@@ -39,9 +39,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "http_accept_language", "~> 2.1"
   # Gem to import from CSV, XLS, XLSX, etc.
   # https://github.com/roo-rb/roo
-  spec.add_dependency "roo", "~> 2.9"
+  spec.add_dependency "roo", "~> 3.0"
   # https://github.com/roo-rb/roo-xls
-  spec.add_dependency "roo-xls", "~> 1.2"
+  spec.add_dependency "roo-xls", "~> 2.0"
   # https://github.com/igorkasyanchuk/active_storage_validations
   spec.add_dependency "active_storage_validations", "~> 1.0"
   # https://github.com/rafaelsales/ulid
