@@ -2,8 +2,7 @@ module ThecoreBackendCommons
   # Generic Sidekiq death handler, registered by config/initializers/sidekiq.rb: with retries off
   # Sidekiq drops a failed job without keeping it anywhere, so this writes one line to the Rails log
   # per failure. Only the job's identity goes in: class (or Mailer#action for a mail job), queue, jid
-  # and the error, never the arguments, which can be huge (a PDF email carries the whole PDF) or
-  # sensitive. Apps add their own handlers next to this one (`config.death_handlers << MyHandler`
+  # and the error, never the arguments, which can be huge or sensitive (docs/adr/0002). Apps add their own handlers next to this one (`config.death_handlers << MyHandler`
   # inside `Sidekiq.configure_server`), e.g. to record failures in their own integration log.
   module DiscardedJobLogger
     MAX_MESSAGE_LENGTH = 500
