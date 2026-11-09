@@ -3,9 +3,11 @@
 ## [3.10.0] - 2026-11-09
 
 ### Changed
-- **No background job is retried** (`config/initializers/sidekiq.rb`): `Sidekiq.default_job_options = { "retry" => false }` on every app. A failed job is kept in neither the retry set nor the Dead Set. A job that must be retried sets its own `sidekiq_options retry: N`. See `docs/adr/0002-no-job-retries-failures-logged.md`.
+- **No background job is retried by default** (`config/initializers/sidekiq.rb`): `Sidekiq.default_job_options["retry"] = false` on every app (`THECORE_JOB_RETRIES` changes it). A failed job is kept in neither the retry set nor the Dead Set. A job that must be retried sets its own `sidekiq_options retry: N`. See `docs/adr/0002-no-job-retries-failures-logged.md`.
+- **At most one failed job kept in Redis** (`config/initializers/sidekiq.rb`): `Sidekiq.failures_max_count = 1` by default (was `sidekiq-failures`' default 1000). `sidekiq-failures`, loaded by `thecore_background_jobs`, stores each failed job's full payload, arguments included, in the Redis `failed` set; it now keeps only the latest, still shown in the Failures tab. Every failure is still logged by the death handler. `test/initializers/sidekiq_server_boot_test.rb` checks on a real Redis that two failures leave only the latest in `failed`, and that a failing ActiveJob and a failing mail job, processed by Sidekiq's real `Processor`, each run exactly once with nothing left in the retry, schedule or dead sets.
 
 ### Added
+- **`THECORE_JOB_RETRIES` and `THECORE_FAILED_JOBS_KEPT`** (`ThecoreBackendCommons::JobFailurePolicy`): an installation changes the app-wide retry count (default 0) and the number of failed jobs kept in Redis (default 1) from the container environment; any value that isn't a valid whole number refuses to boot. A job class still overrides the retry count with `sidekiq_options retry: N`. Documented in the README, CLAUDE.md and ADR 0002, with a warning that ActiveJob's `retry_on` retries independently of Sidekiq.
 - **`ThecoreBackendCommons::DiscardedJobLogger`**, registered as Sidekiq death handler: logs each failed job's class (or `Mailer#action`), queue, jid and error to the Rails log, never its arguments. Apps can append their own handlers next to it. `test/initializers/sidekiq_server_boot_test.rb` boots the dummy app as a Sidekiq server in a child process.
 
 ## [3.9.0] - 2026-10-28

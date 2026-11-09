@@ -11,7 +11,7 @@ module ThecoreBackendCommons
     def self.call(job, exception)
       error = "#{exception.class}: #{exception.message}".truncate(MAX_MESSAGE_LENGTH)
       Rails.logger.error(
-        "Background job #{name_of(job)} failed and was discarded (no retry): " \
+        "Background job #{name_of(job)} failed and was discarded (no retry left): " \
         "queue=#{job["queue"]} jid=#{job["jid"]} error=#{error}"
       )
     rescue StandardError => e

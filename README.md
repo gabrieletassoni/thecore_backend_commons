@@ -159,6 +159,67 @@ overrides it. Full mechanics (idempotency, abstract/STI exclusion, `to_prepare` 
 
 ---
 
+## Background jobs: no retries by default
+
+Every app using this gem runs its background jobs on Sidekiq in production, and by default:
+
+- **a failed job is never retried** (`retry: false`): it runs once, and Sidekiq keeps it in
+  neither the retry set nor the Dead Set;
+- **only the latest failed job is kept in Redis**: `sidekiq-failures` (from
+  `thecore_background_jobs`) stores each failed job's full payload, arguments included, in the
+  Redis `failed` set; it is capped at 1, still visible in the Sidekiq web UI's Failures tab;
+- **every failure is written to the Rails log** by `ThecoreBackendCommons::DiscardedJobLogger`:
+  job class (or `Mailer#action`), queue, jid and error, never the arguments.
+
+Why zero: in a Thecore app in production, mail jobs carrying a whole PDF in their arguments
+failed with a permanent SMTP error and were retried for weeks, then kept in the Dead Set. Redis
+grew to 23 GB until the host's OOM killer put it in a restart loop and no job ran for three days
+(`docs/adr/0002-no-job-retries-failures-logged.md`).
+
+### Changing the defaults on an installation
+
+Set these in the environment of both the `backend` and the `worker` containers. On an
+installation deployed by `thecore_devcontainer` that is the target's
+`vendor/deploytargets/<provider>/<customer>.env`, which reaches both containers through their
+`env_file` (`thecore_devcontainer` ADR 0002); on a hand-written compose, its `environment:`.
+
+| Variable | Unset or blank | Accepted values | Effect |
+| --- | --- | --- | --- |
+| `THECORE_JOB_RETRIES` | `0` (no retries) | a whole number >= 0 | how many times Sidekiq retries a failed job, app-wide |
+| `THECORE_FAILED_JOBS_KEPT` | `1` | a whole number >= 1 | how many failed jobs stay in the Redis `failed` set |
+
+Any other value (`yes`, `-1`, `1.5`, ...) stops the app at boot with an error naming the
+variable: a typo never silently turns retries back on. With retries above 0, a job that uses
+them all ends in Sidekiq's Dead Set, which is capped by count and age but not by size.
+
+### Changing it for one job
+
+A job class sets its own retry count with Sidekiq's option, which wins over the app-wide value
+in both directions (it works on ActiveJob classes and mailers' jobs alike):
+
+```ruby
+class SyncInventoryJob < ApplicationJob
+  sidekiq_options retry: 3   # or retry: false when THECORE_JOB_RETRIES is above 0
+end
+```
+
+**Don't use ActiveJob's `retry_on` for this.** It retries independently of Sidekiq: on failure
+ActiveJob enqueues a new copy of the job, arguments included, whatever `THECORE_JOB_RETRIES`
+says, and the copies never show up as Sidekiq retries.
+
+### Logging failures somewhere else too
+
+Add your own Sidekiq death handler next to the default one; both run:
+
+```ruby
+# config/initializers/sidekiq.rb in the app
+Sidekiq.configure_server do |config|
+  config.death_handlers << ->(job, exception) { MyErrorLog.record(job["jid"], exception) }
+end
+```
+
+---
+
 ## Invio email e configurazione SMTP
 
 ### Configurazione
