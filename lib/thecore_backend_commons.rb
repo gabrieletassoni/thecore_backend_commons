@@ -19,6 +19,7 @@ require "thecore_backend_commons/smtp_config"
 require "thecore_backend_commons/smtp_tester"
 require "thecore_backend_commons/push_notification_service"
 require "thecore_backend_commons/default_module_registry"
+require "thecore_backend_commons/discarded_job_logger"
 
 module ThecoreBackendCommons
   # Deep-merges +dest+ into +src+ (mutating and returning +src+), extending existing arrays
