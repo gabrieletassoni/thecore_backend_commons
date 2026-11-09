@@ -6,6 +6,12 @@
 # See docs/adr/0002-no-job-retries-failures-logged.md.
 Sidekiq.default_job_options = { "retry" => false }
 
+# sidekiq-failures (required by thecore_background_jobs) still stores each failed job's full payload,
+# arguments included, in the Redis `failed` sorted set, and trims it to the last
+# `failures_max_count` after each failure (default 1000: up to 1000 PDF-sized copies). Keep one: the
+# Failures tab still shows the latest failure, and every failure reaches the death handlers below.
+Sidekiq.failures_max_count = 1
+
 # Every failed job leaves a trace in the Rails log (ThecoreBackendCommons::DiscardedJobLogger: class or
 # Mailer#action, queue, jid, error, never the arguments). Apps append their own handlers next to it.
 # The handler is a plain require from lib/thecore_backend_commons.rb, not autoloaded: autoloaded
