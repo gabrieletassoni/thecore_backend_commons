@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.10.0] - 2026-11-09
+
+### Changed
+- **No background job is retried** (`config/initializers/sidekiq.rb`): `Sidekiq.default_job_options = { "retry" => false }` on every app. A failed job is kept in neither the retry set nor the Dead Set. A job that must be retried sets its own `sidekiq_options retry: N`. See `docs/adr/0002-no-job-retries-failures-logged.md`.
+
+### Added
+- **`ThecoreBackendCommons::DiscardedJobLogger`**, registered as Sidekiq death handler: logs each failed job's class (or `Mailer#action`), queue, jid and error to the Rails log, never its arguments. Apps can append their own handlers next to it. `test/initializers/sidekiq_server_boot_test.rb` boots the dummy app as a Sidekiq server in a child process.
+
 ## [3.9.0] - 2026-10-28
 
 ### Changed
