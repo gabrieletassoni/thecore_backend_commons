@@ -9,13 +9,67 @@ require "rbconfig"
 class SidekiqServerBootTest < ActiveSupport::TestCase
   DUMMY_ROOT = File.expand_path("../dummy", __dir__)
 
-  # Runs +script+ after booting the dummy app as a Sidekiq server; returns [output, status].
-  def boot_as_sidekiq_server(script)
+  REDIS_URL = ENV.fetch("REDIS_URL", "redis://redis:6379/15")
+  # The two knobs are unset unless a test sets them, whatever the environment running the tests.
+  KNOBS_UNSET = { "THECORE_JOB_RETRIES" => nil, "THECORE_FAILED_JOBS_KEPT" => nil }.freeze
+
+  # Runs +script+ after booting the dummy app as a Sidekiq server with +env+; returns [output, status].
+  def boot_as_sidekiq_server(script, env = {})
     boot = <<~'RUBY'
       require "sidekiq/cli"
+      # As Sidekiq::CLI#boot_application does: sidekiq/rails before the app, so its engine
+      # initializers run (sidekiq_options on ActiveJob classes, the reloader).
+      require "rails"
+      require "sidekiq/rails"
       require "./config/environment"
     RUBY
-    Open3.capture2e({ "RAILS_ENV" => "test" }, RbConfig.ruby, "-e", boot + script, chdir: DUMMY_ROOT)
+    Open3.capture2e({ "RAILS_ENV" => "test" }.merge(KNOBS_UNSET, env), RbConfig.ruby, "-e", boot + script, chdir: DUMMY_ROOT)
+  end
+
+  # Boots as a Sidekiq server on a real Redis (flushed before and after), runs +jobs+ (Ruby that
+  # defines job classes and enqueues +count+ jobs on the "default" queue through the Sidekiq
+  # ActiveJob adapter), then processes them with Sidekiq's own Processor (fetch, server middleware,
+  # JobRetry), the path a worker takes, plus one more fetch that must find nothing. Prints each
+  # `executions:<name>` counter the jobs increment, the sizes of the queue and of the retry,
+  # schedule, dead and failed sets, and the wrapped class of each job in the retry set.
+  # Returns [output, status]; skips the test when Redis is unreachable.
+  def process_jobs_on_redis(jobs, count:, env: {})
+    output, status = boot_as_sidekiq_server(<<~RUBY, env)
+      require "sidekiq/processor"
+      Sidekiq.configure_server { |c| c.redis = { url: #{REDIS_URL.inspect} } }
+      begin
+        Sidekiq.redis { |r| r.call("PING") }
+      rescue StandardError => e
+        puts "no-redis: \#{e.class}"
+        exit 0
+      end
+      Rails.logger = ActiveSupport::Logger.new(File::NULL)
+      Sidekiq.default_configuration.logger = Logger.new(File::NULL)
+      Sidekiq.redis { |r| r.flushdb }
+      ActiveJob::Base.queue_adapter = :sidekiq
+
+      #{jobs}
+
+      capsule = Sidekiq.default_configuration.default_capsule
+      capsule.queues = ["default"]
+      processor = Sidekiq::Processor.new(capsule) { nil }
+      #{count + 1}.times do
+        processor.send(:process_one) # private: the body of Processor#run's loop
+      rescue StandardError => e
+        puts "process_one: \#{e.class}: \#{e.message}"
+      end
+
+      Sidekiq.redis do |r|
+        r.keys("executions:*").sort.each { |k| puts "\#{k}=\#{r.get(k)}" }
+        puts "queue=\#{r.llen('queue:default')}"
+        %w[retry schedule dead failed].each { |set| puts "\#{set}=\#{r.zcard(set)}" }
+        r.zrange("retry", 0, -1).each { |j| puts "in_retry=\#{Sidekiq.load_json(j)['wrapped']}" }
+        r.flushdb
+      end
+    RUBY
+    assert_booted(output, status)
+    skip "no Redis at #{REDIS_URL}" if output.include?("no-redis:")
+    output
   end
 
   def assert_booted(output, status)
@@ -35,6 +89,37 @@ class SidekiqServerBootTest < ActiveSupport::TestCase
     assert_match(/^failures_max_count=1$/, output)
     handlers = output[/^handlers=(.*)$/, 1].to_s
     assert_equal 1, handlers.scan('"ThecoreBackendCommons::DiscardedJobLogger"').size, "death handlers: #{handlers}"
+  end
+
+  KNOBS_SCRIPT = <<~'RUBY'.freeze
+    puts "retry=#{Sidekiq.default_job_options['retry'].inspect}"
+    puts "failures_max_count=#{Sidekiq.failures_max_count.inspect}"
+  RUBY
+
+  test "THECORE_JOB_RETRIES and THECORE_FAILED_JOBS_KEPT override the defaults; blank or 0 retries keep them off" do
+    {
+      { "THECORE_JOB_RETRIES" => "3", "THECORE_FAILED_JOBS_KEPT" => "5" } => ["3", "5"],
+      { "THECORE_JOB_RETRIES" => "0", "THECORE_FAILED_JOBS_KEPT" => " 2 " } => ["false", "2"],
+      { "THECORE_JOB_RETRIES" => "", "THECORE_FAILED_JOBS_KEPT" => "" } => ["false", "1"]
+    }.each do |env, (retry_value, kept)|
+      output, status = boot_as_sidekiq_server(KNOBS_SCRIPT, env)
+      assert_booted(output, status)
+      assert_match(/^retry=#{retry_value}$/, output, env.inspect)
+      assert_match(/^failures_max_count=#{kept}$/, output, env.inspect)
+    end
+  end
+
+  # A typo must never silently re-enable retries or keep every failed payload: the app refuses to boot.
+  test "an invalid THECORE_JOB_RETRIES or THECORE_FAILED_JOBS_KEPT refuses to boot, naming the variable" do
+    [
+      ["THECORE_JOB_RETRIES", "yes"], ["THECORE_JOB_RETRIES", "-1"], ["THECORE_JOB_RETRIES", "1.5"],
+      ["THECORE_FAILED_JOBS_KEPT", "0"], ["THECORE_FAILED_JOBS_KEPT", "all"]
+    ].each do |variable, value|
+      output, status = boot_as_sidekiq_server(KNOBS_SCRIPT, variable => value)
+      assert_not status.success?, "#{variable}=#{value.inspect} booted:\n#{output}"
+      assert_includes output, "#{variable}=#{value.inspect} is not valid"
+      assert_includes output, "ThecoreBackendCommons::JobFailurePolicy::InvalidValue"
+    end
   end
 
   # Runs a failing mailer job (as ActiveJob enqueues it) through Sidekiq's own JobRetry, the path a
@@ -73,9 +158,8 @@ class SidekiqServerBootTest < ActiveSupport::TestCase
   # Sidekiq.failures_max_count after each failure. Runs two failing jobs through the server
   # middleware chain registered at boot, against a real Redis (REDIS_URL, DB 15 in the devcontainer).
   test "after two failed jobs the Redis failed set holds only the latest" do
-    redis_url = ENV.fetch("REDIS_URL", "redis://redis:6379/15")
     output, status = boot_as_sidekiq_server(<<~RUBY)
-      Sidekiq.configure_server { |c| c.redis = { url: #{redis_url.inspect} } }
+      Sidekiq.configure_server { |c| c.redis = { url: #{REDIS_URL.inspect} } }
       begin
         Sidekiq.redis { |r| r.call("PING") }
       rescue StandardError => e
@@ -100,34 +184,18 @@ class SidekiqServerBootTest < ActiveSupport::TestCase
     RUBY
 
     assert_booted(output, status)
-    skip "no Redis at #{redis_url}" if output.include?("no-redis:")
+    skip "no Redis at #{REDIS_URL}" if output.include?("no-redis:")
     assert_match(/^failed_count=1$/, output)
     assert_equal ["second-jid"], output.scan(/^failed_jid=(.*)$/).flatten
   end
 
-  # A failing job runs exactly once: a plain ActiveJob and a mail job (ActionMailer::MailDeliveryJob)
-  # are enqueued through the Sidekiq adapter into a real Redis and processed by Sidekiq's own
-  # Processor (fetch, server middleware, JobRetry), the path a worker takes. Afterwards nothing is
-  # waiting to run again: the queue, the retry set and the schedule set are empty, and the failures
-  # set holds at most one entry.
-  test "a failing ActiveJob and a failing mail job each run exactly once and are never re-enqueued" do
-    redis_url = ENV.fetch("REDIS_URL", "redis://redis:6379/15")
-    output, status = boot_as_sidekiq_server(<<~RUBY)
-      require "sidekiq/rails" # as Sidekiq::CLI#boot_application does
-      require "sidekiq/processor"
-      Sidekiq.configure_server { |c| c.redis = { url: #{redis_url.inspect} } }
-      begin
-        Sidekiq.redis { |r| r.call("PING") }
-      rescue StandardError => e
-        puts "no-redis: \#{e.class}"
-        exit 0
-      end
-      Rails.logger = ActiveSupport::Logger.new(File::NULL)
-      Sidekiq.default_configuration.logger = Logger.new(File::NULL)
-      Sidekiq.redis { |r| r.flushdb }
-
+  # A failing job runs exactly once: a plain ActiveJob and a mail job (ActionMailer::MailDeliveryJob),
+  # processed the way a worker does. Afterwards nothing is waiting to run again: the queue, the retry
+  # set, the schedule set and the Dead Set are empty, and the failures set holds at most one entry.
+  test "by default a failing ActiveJob and a failing mail job each run exactly once and are never re-enqueued" do
+    output = process_jobs_on_redis(<<~'RUBY', count: 2)
       class AlwaysFailingJob < ActiveJob::Base
-        def perform(payload)
+        def perform(_payload)
           Sidekiq.redis { |r| r.incr("executions:job") }
           raise "job failed"
         end
@@ -140,40 +208,62 @@ class SidekiqServerBootTest < ActiveSupport::TestCase
         end
       end
 
-      ActiveJob::Base.queue_adapter = :sidekiq
       AlwaysFailingJob.set(queue: "default").perform_later("PAYLOAD")
       AlwaysFailingMailer.failing_email.deliver_later(queue: "default")
-
-      capsule = Sidekiq.default_configuration.default_capsule
-      capsule.queues = ["default"]
-      processor = Sidekiq::Processor.new(capsule) { nil }
-      # Two jobs, then one more fetch that must find nothing to run again.
-      3.times do
-        processor.send(:process_one) # private: the body of Processor#run's loop
-      rescue StandardError => e
-        puts "process_one: \#{e.class}: \#{e.message}"
-      end
-
-      Sidekiq.redis do |r|
-        puts "executions_job=\#{r.get('executions:job').to_i}"
-        puts "executions_mail=\#{r.get('executions:mail').to_i}"
-        puts "queue=\#{r.llen('queue:default')}"
-        puts "retry=\#{r.zcard('retry')}"
-        puts "schedule=\#{r.zcard('schedule')}"
-        puts "dead=\#{r.zcard('dead')}"
-        puts "failed=\#{r.zcard('failed')}"
-        r.flushdb
-      end
     RUBY
 
-    assert_booted(output, status)
-    skip "no Redis at #{redis_url}" if output.include?("no-redis:")
-    assert_match(/^executions_job=1$/, output, output)
-    assert_match(/^executions_mail=1$/, output, output)
-    assert_match(/^queue=0$/, output, output)
-    assert_match(/^retry=0$/, output, output)
-    assert_match(/^schedule=0$/, output, output)
-    assert_match(/^dead=0$/, output, output)
+    %w[executions:job=1 executions:mail=1 queue=0 retry=0 schedule=0 dead=0].each do |line|
+      assert_match(/^#{line}$/, output, output)
+    end
     assert_operator output[/^failed=(\d+)$/, 1].to_i, :<=, 1, output
+  end
+
+  # The knob really works: with THECORE_JOB_RETRIES=1 a failed job waits in the retry set. A job's own
+  # `sidekiq_options retry: false` still wins over it.
+  test "THECORE_JOB_RETRIES=1 puts a failed job in the retry set, unless the job opts out" do
+    output = process_jobs_on_redis(<<~'RUBY', count: 2, env: { "THECORE_JOB_RETRIES" => "1" })
+      class RetriedJob < ActiveJob::Base
+        def perform
+          Sidekiq.redis { |r| r.incr("executions:retried") }
+          raise "job failed"
+        end
+      end
+
+      class OptedOutJob < ActiveJob::Base
+        sidekiq_options retry: false
+
+        def perform
+          Sidekiq.redis { |r| r.incr("executions:opted_out") }
+          raise "job failed"
+        end
+      end
+
+      RetriedJob.set(queue: "default").perform_later
+      OptedOutJob.set(queue: "default").perform_later
+    RUBY
+
+    %w[executions:retried=1 executions:opted_out=1 retry=1 in_retry=RetriedJob].each do |line|
+      assert_match(/^#{line}$/, output, output)
+    end
+  end
+
+  # Per-job override: `sidekiq_options retry: N` in an ActiveJob class wins over the default of none.
+  test "an ActiveJob with its own sidekiq_options retry is retried despite the default" do
+    output = process_jobs_on_redis(<<~'RUBY', count: 1)
+      class SelfRetryingJob < ActiveJob::Base
+        sidekiq_options retry: 1
+
+        def perform
+          Sidekiq.redis { |r| r.incr("executions:self_retrying") }
+          raise "job failed"
+        end
+      end
+
+      SelfRetryingJob.set(queue: "default").perform_later
+    RUBY
+
+    %w[executions:self_retrying=1 retry=1 in_retry=SelfRetryingJob].each do |line|
+      assert_match(/^#{line}$/, output, output)
+    end
   end
 end
