@@ -1,6 +1,39 @@
 # CLAUDE.md — thecore_backend_commons
 
 Rails engine gem providing shared backend utilities for the Thecore ecosystem: ActionCable channels, SMTP helpers, application record concerns, and Web Push notification infrastructure.
+It is the generic base gem the rest of the ecosystem depends on (`model_driven_api`, `thecore_ui_rails_admin`, `mytask`, …), public on RubyGems: `.github/workflows/gempush.yml` publishes on a push to `release/3` only when `lib/*/version.rb` changes.
+
+## Where things are
+
+```
+lib/thecore_backend_commons.rb   entry point: requires web-push, roo/roo-xls, smart_merge, JobFailurePolicy, DiscardedJobLogger
+lib/thecore_backend_commons/     SmtpConfig, SmtpTester, PushNotificationService, DefaultModuleRegistry, JobFailurePolicy, DiscardedJobLogger
+app/models/                      PushSubscriber, PushMessage, concerns/time_zone_aware.rb
+app/channels/                    ActivityLogChannel, PushNotificationChannel
+app/jobs/                        PushDispatchJob
+app/mailers/concerns/            SmtpDeliverable
+config/initializers/             application_config.rb (framework-imposed config), sidekiq.rb, concern_cable_connection.rb, default_module_registry.rb
+db/migrate/                      push_subscribers / push_messages migrations
+test/dummy/                      PostgreSQL dummy app
+docs/adr/  GLOSSARY.md  docs/agents/
+```
+
+## Read before working on…
+
+| Topic | File |
+| --- | --- |
+| Entry point, lib modules, mailer concerns, SMTP settings | `docs/agents/architecture.md` |
+| Web Push: PushSubscriber/PushMessage, PushNotificationChannel, PushDispatchJob, PushNotificationService, VAPID, migrations | `docs/agents/web-push.md` |
+| ActivityLogChannel, WebSocket connection authentication (JWT, m2m token) | `docs/agents/action-cable.md` |
+| `TimeZoneAware` (`time_zone_aware` DSL) | `docs/agents/time-zone-aware.md` |
+| `DefaultModuleRegistry` (default modules on every `ApplicationRecord` subclass) | `docs/agents/default-module-registry.md` |
+| Framework-imposed host config, Sidekiq, no job retries, death handlers | `docs/agents/background-jobs.md` |
+| ATOM isolation: what downstream gems inject, no upward references | `docs/agents/atom-isolation.md` |
+| Dummy app, test DB, stubs, `config.assets` convention for consumers | `docs/agents/test-infrastructure.md` |
+| CodeQL, secret scanning, Dependabot | `docs/agents/security-scanning.md` |
+| Tickets (GitHub Issues), triage labels, glossary/ADR layout | `docs/agents/issue-tracker.md`, `triage-labels.md`, `domain.md` |
+
+When behaviour changes, update `CLAUDE.md` or the `docs/agents/` file it points to.
 
 ## Commands
 
@@ -18,234 +51,20 @@ BUNDLE_GEMFILE=Gemfile bundle install
 BUNDLE_GEMFILE=../../Gemfile RAILS_ENV=test bundle exec bin/rails db:create
 ```
 
-No need to unset `DATABASE_URL`: the dummy app's `config/boot.rb` rewrites its database name (see Test infrastructure).
-
-## Architecture
-
-### Entry point
-
-`lib/thecore_backend_commons.rb` — requires all dependencies including `web-push` (for VAPID push notifications) and `roo`/`roo-xls` (spreadsheet import, used by the spot items importer). roo is `~> 3.0` since 3.9.0 so the bundle can take rubyzip >= 3.4 (CVE-2026-85396); roo 4 waits for a roo-xls that allows it. `test/lib/spreadsheet_import_test.rb` checks `.xlsx`/`.xls` parsing.
-
-### Models
-
-**`PushSubscriber`** (`app/models/push_subscriber.rb`):
-Represents a browser/device subscription registered by a `User` for receiving Web Push notifications via VAPID.
-
-Fields: `user_id` (FK), `endpoint` (unique, text), `p256dh`, `auth`, `user_agent`, `expired_at` (datetime, null = active).
-
-Key interface:
-- `PushSubscriber.active` — scope, returns only records with `expired_at IS NULL`
-- `PushSubscriber.subscribe_for(user, endpoint:, p256dh:, auth:, user_agent:)` — upsert by endpoint; resets `expired_at` if subscriber was expired
-- `subscriber.expire!` — sets `expired_at = Time.current`
-- `subscriber.push_messages` — `has_many :push_messages, dependent: :destroy`
-
-API serialization (`json_attrs`) and RailsAdmin configuration are applied from external gems: `model_driven_api` registers `json_attrs` with user data; `thecore_ui_rails_admin` registers rails_admin config. The model itself has no direct dependency on these gems.
-
-**`PushMessage`** (`app/models/push_message.rb`):
-Records a push notification payload tied to a `PushSubscriber`. Created before dispatch; `sent_at` is populated after successful delivery.
-
-Fields: `push_subscriber_id` (FK), `title` (string, required), `body` (text, required), `url` (string, optional), `icon` (string, optional), `sent_at` (datetime), `received_at` (datetime), `read_at` (datetime), `sender_user_id` (FK to `users`, optional — null for system-generated notifications), `message_type` (string, default `"communication"` — `"communication"` for general notifications, `"message"` for direct user messages). Declares `sent_at`/`received_at`/`read_at` through `TimeZoneAware` (see below), gaining `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` columns.
-
-Associations: `belongs_to :sender, class_name: "User", foreign_key: :sender_user_id, optional: true`. Note: `sender_user_id` identifies the *human sender*; `user_id` in `push_subscribers` identifies the *recipient* — do not confuse the two.
-
-Validations: `title` and `body` presence required.
-
-API serialization (`json_attrs`) and RailsAdmin configuration are applied from external gems following the Thecore ATOM isolation principle (see below).
-
-### Channels
-
-**`ActivityLogChannel`** (`app/channels/activity_log_channel.rb`):
-Streams from the `"messages"` room. Used by the frontend to receive real-time model change notifications.
-
-### Connection authentication (`config/initializers/concern_cable_connection.rb`)
-
-`CableConnectionConcern` is `include`d into the host's `ApplicationCable::Connection` (by
-`config/initializers/after_initialize.rb`) and identifies `current_user` for every WebSocket
-connection. `find_verified_user` tries, in order: an existing Warden/Devise session (cookie-based,
-e.g. RailsAdmin), a machine-to-machine token (bcrypt-compared against each user's
-`encrypted_access_token`), then a JWT.
-
-**The JWT signature is verified** (since 3.9.1). `decode_verified_jwt` reuses `model_driven_api`'s
-`JsonWebToken.decode` when that constant is defined — so the WebSocket shares the REST API's signing
-key, key-rotation (`SECRET_KEY_BASE_PREVIOUS`) and single-session (`UsedToken`) handling — and falls
-back to a signature-verifying `JWT.decode(token, secret, true, algorithm: "HS256")` when it isn't
-(this gem's dummy app has no `model_driven_api`, so the fallback is what the tests exercise). Before
-3.9.1 it decoded with verification disabled (`JWT.decode(m, key, false)`), so a token carrying any
-`user_id` but signed with an attacker-chosen key authenticated as that user — and since
-`ActivityLogChannel` streams every model change over the shared `"messages"` room, that was a full
-cross-user read bypass. `test/channels/application_cable/connection_test.rb` covers a valid token,
-a forged-signature token, an `alg=none` token, a missing token, and a validly-signed token for an
-unknown user. The dummy `users` table carries `encrypted_access_token` so the m2m branch runs
-realistically rather than aborting the test transaction on a missing column.
-
-**`PushNotificationChannel`** (`app/channels/push_notification_channel.rb`):
-ActionCable channel for delivering push notifications in real-time to connected browser clients.
-
-Two subscription modes:
-- `params[:subscriber_id]` — streams from a single subscriber's room (only if it belongs to `current_user`)
-- `params[:user_id]` — streams from all active subscribers of that user (only if `params[:user_id].to_i == current_user.id`)
-
-Stream room name: `"push_notifications_subscriber_#{subscriber.id}"`
-
-Class method: `PushNotificationChannel.broadcast_to(subscriber, message)` — broadcasts `message.as_json` to the subscriber's room via `ActionCable.server.broadcast`.
-
-### Jobs
-
-**`PushDispatchJob`** (`app/jobs/push_dispatch_job.rb`):
-ActiveJob job that dispatches a single `PushMessage` via `PushNotificationService`. Enqueued by `Endpoints::PushSubscriber#send_push` (bulk path) — one job per subscriber.
-
-- Queue: `"#{ENV.fetch('COMPOSE_PROJECT_NAME', 'default')}_default"` — follows the Thecore/Spot COMPOSE_PROJECT_NAME convention.
-- `perform(push_message_id)` — loads the `PushMessage` by id (returns early if not found), then calls `ThecoreBackendCommons::PushNotificationService.dispatch(subscriber, message)`.
-
-### Mailer concerns
-
-**`SmtpDeliverable`** (`app/mailers/concerns/smtp_deliverable.rb`):
-Include in ActionMailer subclasses to configure SMTP from `ThecoreSettings` at send time (no restart needed).
-
-### Lib
-
-**`ThecoreBackendCommons::SmtpConfig`** — reads SMTP settings from `ThecoreSettings` (ns: `:smtp`).
-**`ThecoreBackendCommons::SmtpTester`** — sends a test email; callable via `SmtpTester.call("me@example.com")`.
-**`ThecoreBackendCommons::DiscardedJobLogger`** — generic Sidekiq death handler, see No job retries by default.
-**`ThecoreBackendCommons::JobFailurePolicy`** — reads `THECORE_JOB_RETRIES`/`THECORE_FAILED_JOBS_KEPT`, see No job retries by default.
-**`ThecoreBackendCommons::PushNotificationService`** — sends a Web Push notification to a subscriber and records the result on the `PushMessage`.
-
-Key interface:
-- `PushNotificationService.dispatch(subscriber, message)` — class-level entry point; sends the push, updates `message.sent_at` on success, calls `subscriber.expire!` on `Webpush::ExpiredSubscription` or `Webpush::InvalidSubscription`, prunes oldest messages if count exceeds `vapid.max_messages_per_subscriber` limit, and always returns `message`. Errors are rescued and logged; they do not propagate.
-- VAPID keys are read from `ThecoreSettings` (ns `:vapid`, keys `public_key`, `private_key`, `contact_email`) at dispatch time.
-- Push payload includes: `id` (PushMessage PK), `title`, `body`, `sent_at` (ISO 8601, from `created_at`), `type` (from `message_type`, default `"communication"`), `url`, `icon` (nil fields removed via `compact`).
-
-### Time-zone-aware datetime fields (`TimeZoneAware`)
-
-`app/models/concerns/time_zone_aware.rb` provides a class-level DSL, `time_zone_aware(*fields)`, that any model can call on its own UTC datetime fields to expose them three ways in JSON — the raw UTC instant, the same instant localized to the deployment-wide server time zone Setting, and localized to the record's own per-field time zone (falling back to the server Setting when unset). Implements the relevant part of `docs/adr/0009-timezone-aware-datetime-representation.md` (host repo).
-
-This concern originated in the host app's `mytask` gem (a customer-specific "spot" gem) but was relocated here in `thecore_backend_commons` 3.6.0 when `PushMessage` (which lives in this gem) needed the same mechanism for its `sent_at`/`received_at`/`read_at` fields (issue #28, host repo) — `mytask` cannot be a dependency of this gem (wrong direction: this is the generic, ecosystem-wide base gem; `mytask` is IMAS/Bancolini-specific), so the DSL now lives at the lower, shared point in the dependency graph. `mytask` in turn gained a gemspec dependency on this gem (`~> 3.6`) and dropped its own copy, calling this one instead — its own model declarations (`Task`/`Project`/`TimeTable`/`Report`/etc.) are unchanged.
-
-For each declared `field`:
-
-- The migration must already have added a nullable `<field>_time_zone` string column.
-- A `validate` rejects a non-blank `<field>_time_zone` that isn't a valid IANA identifier (via `ActiveSupport::TimeZone[value]`).
-- Two instance methods are defined: `<field>_server_tz` and `<field>_record_tz` (see above).
-- Both are merged into the model's `json_attrs[:methods]` via `ThecoreBackendCommons.smart_merge` (defined in `lib/thecore_backend_commons.rb`, `deep_merge`-based) — same as `BaseApplicationRecordConcern` above. Until 3.8.0 both called `::ModelDrivenApi.smart_merge`, an upward reference to a gem that depends on this one, which crashed with `NameError` in any app without `model_driven_api` (the dummy app hid it with a stub whose shallow-merge semantics even differed from the real one). `ModelDrivenApi.smart_merge` now delegates here; covered by `test/lib/smart_merge_test.rb`, and the dummy app has no stub any more.
-- `TimeZoneAware.localize`/`.server_time_zone` are NULL-safe: a `nil` field value returns `nil`; a blank/invalid/absent zone returns the bare UTC value unshifted.
-
-Declared on: `PushMessage`'s `sent_at`/`received_at`/`read_at` (this gem). `mytask` declares it on `Task`/`Project`, `TimeTable`/`FreeTimeTable`, `Report`/`FreeReport`, `Assignment`, `Milestone`, `Unavailability` — see that gem's own CLAUDE.md.
-
-Test coverage: `test/models/push_message_test.rb`'s "time-zone awareness" section — record zone present/different from server, `NULL` fallback, invalid zone rejected.
-
-### `ThecoreBackendCommons::DefaultModuleRegistry` (`lib/thecore_backend_commons/default_module_registry.rb`)
-
-Shared registry (ADR 0001/0002, `vendor/external/thecore/docs/adr/` in the host app) other gems use to register "default" modules that get `include`d automatically into every `ApplicationRecord` subclass **as it is defined**, instead of each gem independently overriding `inherited` or scanning `ApplicationRecord.subclasses` after boot (which misses classes not yet autoloaded in development).
-
-```ruby
-ThecoreBackendCommons::DefaultModuleRegistry.register(
-  MyDefaultModule, # normally an ActiveSupport::Concern with an `included do ... end` block
-  applies_to: ->(klass) { true } # optional; defaults to every subclass
-)
-```
-
-Registered modules are `include`d, in registration order, into every `ApplicationRecord` subclass matching `applies_to`, at the moment the subclass is defined. `model_driven_api` and `thecore_ui_rails_admin` register their own default modules here (see ADR 0001) rather than each patching `ApplicationRecord.inherited` on their own — this gem is the shared hook point since it's the one the rest of the ecosystem already depends on. Both downstream registrations follow the exact same `config.to_prepare { DefaultModuleRegistry.register(...) }` shape as `default_module_registry.rb`'s own install, for the same eager-loading-ordering reason:
-
-- `model_driven_api`'s `ModelDrivenApiDefaultJsonAttrs` (`config/initializers/default_json_attrs_registration.rb`) — gives every model a default `json_attrs = { except: [] }` with no explicit `Api::ModelName` concern required.
-- `thecore_ui_rails_admin`'s `ThecoreUiRailsAdminDefaultNavigationConcern` (`config/initializers/concern_default_navigation.rb`) — gives every model a default RailsAdmin `navigation_label`/`navigation_icon` with no explicit `RailsAdmin::ModelName` concern required.
-
-Both compose safely with an explicit per-model concern: since `ApplicationRecord.inherited` fires before the subclass's own body executes, the default is always applied first and a later `include Api::ModelName`/`RailsAdmin::ModelName` in the class body always runs after, freely overriding it.
-
-- **Wiring**: `ThecoreBackendCommons::DefaultModuleRegistry::InheritedHook` is prepended onto `ApplicationRecord.singleton_class` (via `.install!`) from `config/initializers/default_module_registry.rb`, inside `config.to_prepare` — **not** `config.after_initialize`. Rails runs `to_prepare` callbacks *before* `eager_load!`, while `after_initialize` runs *after* it (`Rails::Application::Finisher`); installing from `after_initialize` would miss every subclass eager-loaded in production. `to_prepare` also re-runs on every class reload in development — `install!` is idempotent (checks the singleton-class ancestor chain before prepending).
-- **`inherited` composition**: `InheritedHook#inherited` calls `super` first, then `DefaultModuleRegistry.apply_to(subclass)` — this both lets ActiveRecord's own `inherited` (STI `base_class` bookkeeping) run first, and composes correctly with any other gem's pre-existing `inherited` hook elsewhere in the singleton-class ancestor chain.
-- **Idempotency**: registering the same module object twice is a no-op (the original registration/`applies_to` is kept). `apply_to` never re-`include`s a module a class already has in its ancestor chain, so STI subclasses inherit a default module from their base class rather than being separately (re-)included.
-- **Abstract classes**: `apply_to` is a no-op for any class where `klass.abstract_class?` is true. `ApplicationRecord` itself (`primary_abstract_class`) never receives default modules through this mechanism at all, structurally — `ApplicationRecord.inherited` only fires for classes inheriting *from* `ApplicationRecord`, never for `ApplicationRecord`'s own definition. Note: because Ruby's `inherited` hook fires *before* the new subclass's own body executes, a class that sets `self.abstract_class = true` as a body statement (rather than being `primary_abstract_class`) may transiently see defaults applied to it before that assignment takes effect — a general Ruby ordering constraint, not something `apply_to` can detect synchronously.
-- **Test helper**: `DefaultModuleRegistry.reset!` clears all registrations — not for production use.
-
-See `test/lib/thecore_backend_commons/default_module_registry_test.rb` for coverage of registration/application order, `applies_to` filtering, abstract/STI exclusion, `super` composition, and double-registration.
-
-## Framework-imposed host app config (`config/initializers/application_config.rb`)
-
-Settings this gem sets unconditionally on every consuming app, with no per-app opt-out — see `GLOSSARY.md` for the "framework-imposed convention vs. app-owned choice" vocabulary and `docs/adr/0001-active-job-queue-adapter-is-framework-imposed.md` for the reasoning and full precedent list: `config.relative_url_root`, `config.assets.prefix`, `config.active_storage` disk config, `config.action_mailer.delivery_method = :smtp`, `config.action_cable.allowed_request_origins`, and — production only — `config.active_job.queue_adapter = :sidekiq` (development/test stay on Rails' `:async` default). An app that genuinely needs a different production queue adapter must override it explicitly, after this initializer runs.
-
-### No job retries by default (`config/initializers/sidekiq.rb`)
-
-`ThecoreBackendCommons::JobFailurePolicy.apply!` (`lib/thecore_backend_commons/job_failure_policy.rb`, a plain `require`) sets, on every app, mailer jobs included:
-
-- **no retries**: `Sidekiq.default_job_options["retry"] = false`. Sidekiq 7 then keeps a failed job in neither the retry set nor the Dead Set: it calls the death handlers and drops the job. Retried mail jobs carrying a whole PDF once filled a Thecore app's Redis to 23 GB (`docs/adr/0002-no-job-retries-failures-logged.md`).
-- **one failed job kept**: `Sidekiq.failures_max_count = 1`. `sidekiq-failures` (from `thecore_background_jobs`) stores each failed job's full payload, arguments included, in the Redis `failed` set and trims it to that count after each failure (its own default is 1000). The latest failure stays visible in the Failures tab.
-
-Each installation can change them from the container environment (`backend` and `worker` alike; on a `thecore_devcontainer` deploy, the target's `vendor/deploytargets/<provider>/<customer>.env`, passed through by `env_file`, that repo's ADR 0002):
-
-| Variable | Unset/blank | Valid | Effect |
-| --- | --- | --- | --- |
-| `THECORE_JOB_RETRIES` | `0` (`retry: false`) | whole number >= 0 | app-wide Sidekiq retry count |
-| `THECORE_FAILED_JOBS_KEPT` | `1` | whole number >= 1 | `Sidekiq.failures_max_count` |
-
-Anything else raises `JobFailurePolicy::InvalidValue` and the app refuses to boot: a typo must never silently re-enable retries. `0` retries becomes `false`, never `retry: 0` (which still sends exhausted jobs to the Dead Set). A job class overrides the count for itself with `sidekiq_options retry: N` / `retry: false` (works on ActiveJob classes, wins both ways). **ActiveJob's `retry_on` is outside all of this**: it re-enqueues a new copy of the job, arguments included, whatever `THECORE_JOB_RETRIES` says; prefer `sidekiq_options retry: N`.
-
-Inside `Sidekiq.configure_server` it registers `ThecoreBackendCommons::DiscardedJobLogger` (`lib/thecore_backend_commons/discarded_job_logger.rb`) as death handler, once: one Rails log line per failure with no retry left, with the job class (or `Mailer#action`), queue, jid and error, **never the arguments**. Both are plain `require`s from `lib/thecore_backend_commons.rb`, never autoloaded: autoloaded constants aren't available to initializers and `configure_server` only runs inside the Sidekiq process, so a missing constant crashes only the worker. Apps append their own handlers in their own initializer (`config.death_handlers << MyHandler`); engine initializers run first, so both run. `mytask-imas` keeps its `JobFailureLog` (writes `IntegrationLog`) this way.
-
-Test: `test/initializers/sidekiq_server_boot_test.rb` boots the dummy app as a Sidekiq server in a child process, as `Sidekiq::CLI` does (`sidekiq/rails` required before the app, so `configure_server` and the ActiveJob integration run). It checks the defaults, valid and invalid values of both variables (invalid ones must refuse to boot), and a failing mail job through the real `JobRetry#global` (log line without arguments; no Redis needed). On a real Redis (`REDIS_URL`, e.g. `redis://redis:6379/15`; skipped when unreachable) it checks: two failures leave only the latest in `failed`; a failing ActiveJob and a failing `ActionMailer::MailDeliveryJob` processed by Sidekiq's real `Processor` run exactly once and leave nothing in the queue, `retry`, `schedule` or `dead`; `THECORE_JOB_RETRIES=1` puts a failed job in the retry set unless it has `sidekiq_options retry: false`; and `sidekiq_options retry: 1` on an ActiveJob wins over the default.
-
-## ThecoreSettings keys
-
-### SMTP (ns: `:smtp`)
-`address`, `port`, `domain`, `user_name`, `password`, `authentication`, `enable_starttls_auto`, `from`, `delivery_method`
-
-### VAPID (ns: `:vapid`)
-| Key | Purpose | Default |
-|-----|---------|---------|
-| `public_key` | VAPID public key (base64url) | generated at seed |
-| `private_key` | VAPID private key (base64url) | generated at seed |
-| `contact_email` | Contact email for VAPID `sub` claim | `""` |
-| `max_messages_per_subscriber` | PushMessage retention limit per subscriber | `"500"` |
-
-Keys are generated automatically at `db:seed` if absent. **Regenerating keys invalidates all existing PushSubscribers** — browsers must re-subscribe.
-
-## Migrations
-
-- `20260616000001_create_push_subscribers` — creates `push_subscribers` table with unique index on `endpoint`
-- `20260616000002_create_push_messages` — creates `push_messages` table with FK to `push_subscribers`
-- `20260625000001_add_sender_user_id_to_push_messages` — adds optional `sender_user_id` (FK to `users`) to `push_messages`
-- `20260629000001_add_message_type_to_push_messages` — adds `message_type` string column (not null, default `"communication"`) to `push_messages`
-- `20260908000010_add_time_zone_columns_to_push_messages` — adds `sent_at_time_zone`/`received_at_time_zone`/`read_at_time_zone` string columns to `push_messages` (version deliberately picked past `mytask`'s own `2026090800000{1..9}` range — engine migration versions share one `schema_migrations` table across the whole host app, so they must be globally unique, not just unique within this gem)
-
-## ATOM isolation principle
-
-`thecore_backend_commons` owns only core domain logic (models, channels, services). It has **no dependency** on `model_driven_api` or `rails_admin`. API serialization (`json_attrs`) and RailsAdmin configuration for `PushSubscriber` and `PushMessage` are injected by downstream gems via `after_initialize`:
-
-| Gem | What it injects | Where |
-|-----|----------------|-------|
-| `model_driven_api` | `ModelDrivenApiPushSubscriber` / `ModelDrivenApiPushMessage` (json_attrs) | `config/initializers/after_initialize_for_model_driven_api.rb` |
-| `thecore_ui_rails_admin` | `ThecoreUiRailsAdminPushSubscriberConcern` / `ThecoreUiRailsAdminPushMessageConcern` (rails_admin) | `config/initializers/after_initialize.rb` |
-
-`name` and `surname` are included in `only:` for the user/sender serialization — Rails `as_json` silently omits columns that don't exist on the model, so the serialization is safe across all environments.
-
-**No upward references**: this gem never references `::ModelDrivenApi` (which depends on it). `json_attrs` composition uses this gem's own `ThecoreBackendCommons.smart_merge`; `ModelDrivenApi.smart_merge` delegates to it. Before 3.8.0 `BaseApplicationRecordConcern` and `TimeZoneAware` called `::ModelDrivenApi.smart_merge` directly, so a host/dummy app without `model_driven_api` failed model boot with `NameError` unless it defined a stub.
-
-## Test infrastructure
-
-The dummy app (`test/dummy/`) runs on **PostgreSQL only** — like every Thecore gem and host app (this gem uses Postgres-specific SQL; never SQLite). `test/dummy/config/database.yml` uses `adapter: postgresql` (host/port/user/password from `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`, defaulting to `db`/`5432`/`postgres`/`postgres`) with databases `thecore_backend_commons_{development,test,production}`. Because `DATABASE_URL` overrides `database.yml` and the devcontainer points it at the host app's dev DB (which the schema load, `force: :cascade`, or `db:test:prepare` would clobber), `test/dummy/config/boot.rb` keeps `DATABASE_URL`'s server/credentials but swaps its database name to `thecore_backend_commons_<RAILS_ENV>` — done in boot.rb rather than the test helper so every entry point (`bin/rails db:*`, Rails' `db:test:prepare` subprocess) is covered. Create the test DB once with `RAILS_ENV=test bin/rails db:create` (see Commands). Key stubs in `test/dummy/config/application.rb`:
-- `ModelDrivenApi.smart_merge` stub (model_driven_api not in bundle)
-- `config.action_mailbox` stub (not in rails/all)
-- `config.assets` stub (sprockets not in bundle)
-- `User`, `Ability`, `ApplicationCable::Connection` preloaded before `run_load_hooks`
-- `has_rich_text` stubbed via `ActiveSupport.on_load(:active_record)`
-
-**Convention for any gem consuming this one**: `config/initializers/application_config.rb` unconditionally sets `config.assets.prefix` at boot — every downstream gem's own dummy test app hits this the moment it eager-loads far enough to run this initializer, since `config.assets` doesn't exist unless a Sprockets/Propshaft railtie is loaded. Do **not** add a real `sprockets-rails` dependency just to satisfy this one line — stub `config.assets` the same way this file and `thecore_ui_rails_admin`'s dummy app do (a `method_missing`-based stub prepended onto `Rails::Application::Configuration`). Confirmed working in `thecore_download_documents` and `thecore-spot-overrides`'s own dummy apps.
-
-## Security scanning
-
-Configured in the GitHub repository settings, not in files:
-
-- **CodeQL** default setup (Ruby, the Actions workflows, and JavaScript/TypeScript where the gem
-  ships any): on every push to `release/3`, on pull requests and weekly. Findings: Security → Code
-  scanning.
-- **Secret scanning with push protection**: a push containing a recognised secret is rejected. It
-  is the only check that blocks anything. If it fires on a real secret, remove it from the commit and
-  rotate the secret; never bypass it.
-- **Dependabot alerts and security updates**, but no `dependabot.yml`, so no routine version-bump
-  pull requests. This gem commits no `Gemfile.lock`, so Dependabot only sees the gemspec and the
-  workflow Actions: CVEs in the resolved Ruby dependencies are caught by `bundler-audit` in the host
-  apps' pipelines, whose `Gemfile.lock` resolves every ATOM.
-- Findings never block a release: GitHub notifies the owner. When one needs work, open a GitHub
-  issue (see Agent skills).
+No need to unset `DATABASE_URL`: the dummy app's `config/boot.rb` rewrites its database name (see `docs/agents/test-infrastructure.md`).
+
+## Rules
+
+- **PostgreSQL only** for the dummy app and tests, never SQLite (this gem uses Postgres-specific SQL).
+- **No dependency on `model_driven_api` or `rails_admin`**, and never reference `::ModelDrivenApi` (it depends on this gem): `json_attrs` composition uses `ThecoreBackendCommons.smart_merge`. API serialization and RailsAdmin config are injected by those gems (`docs/agents/atom-isolation.md`).
+- Engine migration versions share one `schema_migrations` table across the whole host app, so they must be **globally unique**, not just unique within this gem.
+- Constants used by initializers or `Sidekiq.configure_server` (`JobFailurePolicy`, `DiscardedJobLogger`) are plain `require`s from `lib/thecore_backend_commons.rb`, never autoloaded: a missing constant crashes only the worker.
+- Job retries: off by default. An invalid `THECORE_JOB_RETRIES`/`THECORE_FAILED_JOBS_KEPT` must refuse to boot; `0` retries is `retry: false`, never `retry: 0`. Death handlers never log job arguments. Prefer `sidekiq_options retry: N` over ActiveJob's `retry_on` (`docs/agents/background-jobs.md`).
+- `DefaultModuleRegistry` is installed from `config.to_prepare`, **not** `config.after_initialize` (which would miss eager-loaded subclasses in production).
+- The WebSocket JWT signature is always verified (`docs/agents/action-cable.md`).
+- **Regenerating VAPID keys invalidates all existing PushSubscribers** — browsers must re-subscribe.
+- Consuming gems' dummy apps stub `config.assets`; do **not** add a real `sprockets-rails` dependency for it.
+- Secret scanning push protection: if it fires on a real secret, remove it from the commit and rotate the secret; never bypass it.
 
 ## Agent skills
 

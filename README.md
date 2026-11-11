@@ -155,7 +155,7 @@ and `thecore_ui_rails_admin`'s `ThecoreUiRailsAdminDefaultNavigationConcern` (de
 that still needs custom behavior keeps (or adds) an explicit `Api::ModelName`/
 `RailsAdmin::ModelName` concern exactly as before; it simply runs *after* the default and
 overrides it. Full mechanics (idempotency, abstract/STI exclusion, `to_prepare` vs
-`after_initialize` timing) are documented in this gem's `CLAUDE.md`.
+`after_initialize` timing) are documented in this gem's `docs/agents/default-module-registry.md`.
 
 ---
 
