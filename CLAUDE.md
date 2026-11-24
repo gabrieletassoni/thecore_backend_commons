@@ -1,7 +1,7 @@
 # CLAUDE.md — thecore_backend_commons
 
 Rails engine gem providing shared backend utilities for the Thecore ecosystem: ActionCable channels, SMTP helpers, application record concerns, and Web Push notification infrastructure.
-It is the generic base gem the rest of the ecosystem depends on (`model_driven_api`, `thecore_ui_rails_admin`, `mytask`, …), public on RubyGems: `.github/workflows/gempush.yml` publishes on a push to `release/3` only when `lib/*/version.rb` changes.
+It is the generic base gem the rest of the ecosystem depends on (`model_driven_api`, `thecore_ui_rails_admin`, `mytask`, …), public on RubyGems: `.github/workflows/gempush.yml` runs the test suite (PostgreSQL 15, Ruby 3.3, JUnit report kept as the `junit` artifact) on every push and pull request on `release/3`; on a push its `publish` job runs only when the tests are green, and only for a version in `lib/*/version.rb` with no tag yet: it tags it, creates the GitHub release with the JUnit report attached, and pushes the gem to RubyGems. A red test never publishes. The CI test job also runs a Redis 7 service, so the Sidekiq server tests run instead of skipping.
 
 ## Where things are
 
@@ -41,8 +41,8 @@ When behaviour changes, update `CLAUDE.md` or the `docs/agents/` file it points 
 # Run tests (from inside the submodule directory)
 BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib test/models/push_subscriber_test.rb
 
-# Run all tests
-BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib -e "Dir['test/**/*_test.rb'].each { |f| require_relative f }"
+# Run all tests (as CI does; JUNIT_REPORT_DIR=tmp/junit also writes the JUnit XML)
+bin/test
 
 # Bundle install
 BUNDLE_GEMFILE=Gemfile bundle install
