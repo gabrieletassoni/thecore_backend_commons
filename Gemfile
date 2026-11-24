@@ -5,15 +5,12 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 gemspec
 
 # The Rails line this suite runs on (Odoo #6089, ADR 0033): Rails 8.1, the only one CI tests.
-# The gem itself keeps declaring Rails 7.2 (dual support, best effort): `RAILS_VERSION=7.2
-# bundle update rails && RAILS_VERSION=7.2 bin/test` runs the same suite on 7.2.4 locally. Both lines are
-# pinned because a fresh CI resolution otherwise drifts (Odoo #6088); minitest stays on 5, since
-# Rails 7.2's test runner breaks on minitest 6.
-if ENV["RAILS_VERSION"] == "7.2"
-  gem "rails", "~> 7.2.4"
-else
-  gem "rails", "~> 8.1", ">= 8.1.4.1"
-end
+# Dual support is best effort: the gemspec names no Rails version, its dependencies must keep
+# resolving on 7.2 too. `RAILS_VERSION=7.2 bundle update rails && RAILS_VERSION=7.2 <run the suite>`
+# runs it on 7.2.4 locally. Both lines are pinned because a fresh CI resolution otherwise drifts
+# (Odoo #6088); minitest stays on 5, since Rails 7.2's test runner breaks on minitest 6.
+RAILS_LINE = ENV["RAILS_VERSION"] == "7.2" ? ["~> 7.2.4"] : ["~> 8.1", ">= 8.1.4.1"]
+gem "rails", *RAILS_LINE
 gem "minitest", "~> 5.25"
 
 gem "pg"
