@@ -1,5 +1,9 @@
 # Configure Rails Environment
 ENV["RAILS_ENV"] = "test"
+# The WebSocket JWT is signed with SECRET_KEY_BASE (no credentials in the dummy app): CI has none,
+# so a run without it gets a throwaway one, as the host apps' CI does.
+require "securerandom"
+ENV["SECRET_KEY_BASE"] ||= SecureRandom.hex(64)
 
 require_relative "../test/dummy/config/environment"
 require "rails/test_help"
