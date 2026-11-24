@@ -249,6 +249,8 @@ $RECYCLE.BIN/
 *.lock
 *.sqlite3
 schema.rb
+# ...except the dummy app's: the test helper loads it, so CI needs it in the repository.
+!/test/dummy/db/schema.rb
 development_secret.txt
 *.log
 *.pid
