@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.11.0] - 2026-11-24
+
+### Changed
+- **Dual support Rails 7.2/8.1** (Odoo #6089): `rails-i18n >= 7.0, < 9` (was `~> 7.0`, whose 7.x releases require `railties < 8`), so the same 3.x bundle resolves on Rails 7.2.4 (rails-i18n 7.0.x) and on Rails 8.1.4.1 (rails-i18n 8.x). The test suite and its CI now run on Rails 8.1 (`~> 8.1, >= 8.1.4.1`, minitest 5); `RAILS_VERSION=7.2` runs the same suite on 7.2.4 locally (best effort, not in CI). No 8.1-only API is used.
+
 ## [3.10.0] - 2026-11-09
 
 ### Changed

@@ -44,6 +44,9 @@ BUNDLE_GEMFILE=Gemfile RAILS_ENV=test bundle exec ruby -Itest -Ilib test/models/
 # Run all tests (as CI does; JUNIT_REPORT_DIR=tmp/junit also writes the JUnit XML)
 bin/test
 
+# Same suite on Rails 7.2.4 (best effort, not in CI); plain `bundle update rails` goes back to 8.1
+RAILS_VERSION=7.2 bundle update rails && RAILS_VERSION=7.2 bin/test
+
 # Bundle install
 BUNDLE_GEMFILE=Gemfile bundle install
 
@@ -56,6 +59,7 @@ No need to unset `DATABASE_URL`: the dummy app's `config/boot.rb` rewrites its d
 ## Rules
 
 - **PostgreSQL only** for the dummy app and tests, never SQLite (this gem uses Postgres-specific SQL).
+- **Dual support Rails 7.2/8.1** (host ADR 0033, Odoo #6089): the gemspec must resolve on both (`rails-i18n >= 7.0, < 9`), the `Gemfile` runs the suite on Rails 8.1 (the only line CI tests), and no 8.1-only API may be used. `RAILS_VERSION=7.2` is the best-effort check on 7.2.4.
 - **No dependency on `model_driven_api` or `rails_admin`**, and never reference `::ModelDrivenApi` (it depends on this gem): `json_attrs` composition uses `ThecoreBackendCommons.smart_merge`. API serialization and RailsAdmin config are injected by those gems (`docs/agents/atom-isolation.md`).
 - Engine migration versions share one `schema_migrations` table across the whole host app, so they must be **globally unique**, not just unique within this gem.
 - Constants used by initializers or `Sidekiq.configure_server` (`JobFailurePolicy`, `DiscardedJobLogger`) are plain `require`s from `lib/thecore_backend_commons.rb`, never autoloaded: a missing constant crashes only the worker.

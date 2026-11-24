@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "deep_merge", "~> 1.2"
   # Rails
   # https://github.com/svenfuchs/rails-i18n
-  spec.add_dependency "rails-i18n", "~> 7.0"
+  spec.add_dependency "rails-i18n", ">= 7.0", "< 9"
   # https://github.com/tigrish/devise-i18n
   spec.add_dependency "devise-i18n", "~> 1.10"
   # Auto Locale
