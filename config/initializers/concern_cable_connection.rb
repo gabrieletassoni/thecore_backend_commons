@@ -16,7 +16,7 @@ module CableConnectionConcern
       # trusted, before looking at any token. Devise throws :warden when it refuses the session's
       # user (a locked one): outside the Warden middleware nobody catches it, so catch it here.
       warden_user = catch(:warden) { env["warden"]&.user }
-      return verified(warden_user) if warden_user.is_a?(User)
+      return active_or_reject(warden_user) if warden_user.is_a?(User)
 
       # Looks for a token in the query parameters, or in the "Authorization" header.
       m = request.query_parameters["token"].presence ||
@@ -29,7 +29,7 @@ module CableConnectionConcern
       if User.column_names.include?("encrypted_access_token")
         m2m_user = User.where.not(encrypted_access_token: nil)
                        .find { |u| BCrypt::Password.new(u.encrypted_access_token) == m } rescue nil
-        return verified(m2m_user) if m2m_user
+        return active_or_reject(m2m_user) if m2m_user
       end
 
       # JWT: the signature MUST be verified, exactly like every REST request. Decoding with the
@@ -38,7 +38,7 @@ module CableConnectionConcern
       # record change, so that was a full read bypass. See docs/adr and the issue tracker.
       body = decode_verified_jwt(m)
       jwt_user = User.find_by(id: body[:user_id]) if body && body[:user_id]
-      return verified(jwt_user) if jwt_user
+      return active_or_reject(jwt_user) if jwt_user
 
       # Neither a valid m2m nor a valid JWT token: refuse the connection.
       reject_unauthorized_connection
@@ -47,7 +47,7 @@ module CableConnectionConcern
     # A locked user is refused whatever credential they still hold (session, m2m token, JWT):
     # User#active_for_authentication? is the check every login channel uses (thecore_auth_commons
     # >= 3.7.0; Odoo #6051).
-    def verified(user)
+    def active_or_reject(user)
       user.active_for_authentication? ? user : reject_unauthorized_connection
     end
 
