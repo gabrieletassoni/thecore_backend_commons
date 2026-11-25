@@ -1,7 +1,7 @@
 # CLAUDE.md — thecore_backend_commons
 
 Rails engine gem providing shared backend utilities for the Thecore ecosystem: ActionCable channels, SMTP helpers, application record concerns, and Web Push notification infrastructure.
-It is the generic base gem the rest of the ecosystem depends on (`model_driven_api`, `thecore_ui_rails_admin`, `mytask`, …), public on RubyGems: `.github/workflows/gempush.yml` runs the test suite (PostgreSQL 15, Ruby 3.3, JUnit report kept as the `junit` artifact) on every push and pull request on `release/3`; on a push its `publish` job runs only when the tests are green, and only for a version in `lib/*/version.rb` with no tag yet: it pushes the gem to RubyGems, then tags it and creates the GitHub release with the JUnit report attached. A red test never publishes. The CI test job also runs a Redis 7 service, so the Sidekiq server tests run instead of skipping.
+It is the generic base gem the rest of the ecosystem depends on (`model_driven_api`, `thecore_ui_rails_admin`, `mytask`, …), public on RubyGems: `.github/workflows/gempush.yml` runs the test suite (PostgreSQL 15, Ruby 3.3, JUnit report kept as the `junit` artifact) on every push and pull request on `release/3`; on a push its `publish` job runs only when the tests are green, and only for a version in `lib/*/version.rb` with no tag yet: it pushes the gem to RubyGems, then tags it and creates the GitHub release with the JUnit report attached. If a rerun finds the version already on RubyGems (the tag push failed after the gem push), it skips the push and creates the tag and the release. A red test never publishes. The CI test job also runs a Redis 7 service, so the Sidekiq server tests run instead of skipping.
 
 ## Where things are
 
