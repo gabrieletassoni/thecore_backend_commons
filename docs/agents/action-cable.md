@@ -37,4 +37,4 @@ floor: `super && !locked?`), else the connection is rejected. On a real host Dev
 so `find_verified_user` catches it itself and falls through to the tokens (until 3.12.0 that throw
 escaped as `UncaughtThrowError`). The dummy `User` mirrors the predicate (`!locked?`) and its
 schema has `locked`; the connection test covers a locked user by JWT, by Warden session, by a
-Devise-style throw and by m2m token.
+Devise-style throw and by m2m token. Only new connections are checked: a WebSocket opened before the lock stays open until it drops (the next reconnect is refused; ActionCable re-authenticates only on connect).
