@@ -25,5 +25,16 @@ back to a signature-verifying `JWT.decode(token, secret, true, algorithm: "HS256
 `ActivityLogChannel` streams every model change over the shared `"messages"` room, that was a full
 cross-user read bypass. `test/channels/application_cable/connection_test.rb` covers a valid token,
 a forged-signature token, an `alg=none` token, a missing token, and a validly-signed token for an
-unknown user. The dummy `users` table carries `encrypted_access_token` so the m2m branch runs
-realistically rather than aborting the test transaction on a missing column.
+unknown user. The dummy `users` table has no `encrypted_access_token` (that column comes from
+thecore-spot-overrides, above this gem), so the default run covers a host without m2m tokens; the
+m2m test adds the column inside its own transaction.
+
+**Locked users are refused** (3.12.0, Odoo #6051): whichever credential matched (session, m2m token,
+JWT), the user must pass `User#active_for_authentication?` (thecore_auth_commons >= 3.7.0, a gemspec
+floor: `super && !locked?`), else the connection is rejected. On a real host Devise's
+`after_set_user` hook already refuses a locked session user by `throw :warden` while
+`env["warden"].user` fetches it; the WebSocket handler runs outside the Warden middleware's `catch`,
+so `find_verified_user` catches it itself and falls through to the tokens (until 3.12.0 that throw
+escaped as `UncaughtThrowError`). The dummy `User` mirrors the predicate (`!locked?`) and its
+schema has `locked`; the connection test covers a locked user by JWT, by Warden session, by a
+Devise-style throw and by m2m token.

@@ -23,7 +23,9 @@ Gem::Specification.new do |spec|
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
   end
 
-  spec.add_dependency "thecore_auth_commons", "~> 3.2"
+  # 3.7: User#active_for_authentication? refuses a locked user; the ActionCable connection asks it
+  # (Odoo #6051). Before it, Devise's default lets everyone in.
+  spec.add_dependency "thecore_auth_commons", "~> 3.7"
   spec.add_dependency "thecore_background_jobs", "~> 3.0"
   spec.add_dependency "ostruct"
   # ThecoreBackendCommons.smart_merge (json_attrs composition), moved here from model_driven_api

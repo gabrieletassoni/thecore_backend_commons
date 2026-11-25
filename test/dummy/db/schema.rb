@@ -3,6 +3,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_08_000010) do
     t.string "email", null: false, default: ""
     t.string "encrypted_password", null: false, default: ""
     t.datetime "remember_created_at"
+    t.boolean "locked", null: false, default: false # thecore_auth_commons' add_locked_to_user
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
